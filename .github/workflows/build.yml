@@ -82,11 +82,12 @@ jobs:
           echo "ANDROID_NDK_ROOT=$NDK_DIR" >> "$GITHUB_ENV"
 
       # ===================== 2b. 安装 Android SDK (Gradle 编 AAR 必需) =====================
-      # Media3 1.5.1 需要 compileSdk=35 + AGP 8.3.2，必须安装：
-      #   - Android SDK Platform 35
-      #   - Android SDK Build-Tools (随便一个较新版本，比如 35.0.0)
-      #   - 接受 licenses，否则 Gradle 会拒绝
-      - name: "[Android SDK] 安装 cmdline-tools + Platform 35 + Build-Tools 35"
+      # Media3 1.5.1 的公共 build config（common_library_config.gradle）写死：
+      #   compileSdk = 35   → 需要装 Android SDK Platform 35
+      #   buildToolsVersion = "34.0.0"   → 必须精确装 Build-Tools 34.0.0（35.0.0 不行，AGP 会强校验版本号一致并报 Failed to find Build Tools revision 34.0.0）
+      #   外加 platform-tools（adb 等通用工具）
+      #   最后要接受 licenses，否则 Gradle 会拒绝
+      - name: "[Android SDK] 安装 cmdline-tools + Platform 35 + Build-Tools 34.0.0"
         timeout-minutes: 15
         run: |
           set -eu
@@ -103,10 +104,10 @@ jobs:
           export PATH="${SDK_ROOT}/cmdline-tools/latest/bin:${SDK_ROOT}/platform-tools:${PATH}"
           # 接受全部 license（避免 Gradle 报告 license 未接受）
           yes | sdkmanager --sdk_root="${SDK_ROOT}" --licenses || true
-          # 安装 Platform 35 + Build-Tools 35.0.0
+          # 安装 Platform 35 + Build-Tools 34.0.0（严格匹配 Media3 1.5.1 硬编码 buildToolsVersion） + platform-tools
           sdkmanager --sdk_root="${SDK_ROOT}" --install \
             "platforms;android-35" \
-            "build-tools;35.0.0" \
+            "build-tools;34.0.0" \
             "platform-tools"
           echo "==== SDK 目录结构 ===="
           ls "${SDK_ROOT}/platforms/"
