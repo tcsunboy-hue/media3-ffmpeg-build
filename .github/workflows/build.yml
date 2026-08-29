@@ -76,6 +76,40 @@ jobs:
           # 输出 GITHUB_ENV，后续步骤可以读 $ANDROID_NDK_ROOT
           echo "ANDROID_NDK_ROOT=/opt/android-ndk-r25c" >> "$GITHUB_ENV"
 
+      # ===================== 2b. 安装 Android SDK (Gradle 编 AAR 必需) =====================
+      # Media3 1.5.1 需要 compileSdk=35 + AGP 8.3.2，必须安装：
+      #   - Android SDK Platform 35
+      #   - Android SDK Build-Tools (随便一个较新版本，比如 35.0.0)
+      #   - 接受 licenses，否则 Gradle 会拒绝
+      - name: "[Android SDK] 安装 cmdline-tools + Platform 35 + Build-Tools 35"
+        timeout-minutes: 15
+        run: |
+          set -eu
+          SDK_ROOT="/opt/android-sdk"
+          mkdir -p "${SDK_ROOT}/cmdline-tools"
+          cd /tmp
+          # 下载 commandline-tools (包含 sdkmanager)
+          wget -q --show-progress \
+            "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" \
+            -O sdk-cmdline.zip
+          unzip -q sdk-cmdline.zip -d "${SDK_ROOT}/cmdline-tools"
+          # cmdline-tools 必须放在 cmdline-tools/latest 目录下，否则 sdkmanager 找不到自己
+          mv "${SDK_ROOT}/cmdline-tools/cmdline-tools" "${SDK_ROOT}/cmdline-tools/latest"
+          export PATH="${SDK_ROOT}/cmdline-tools/latest/bin:${SDK_ROOT}/platform-tools:${PATH}"
+          # 接受全部 license（避免 Gradle 报告 license 未接受）
+          yes | sdkmanager --sdk_root="${SDK_ROOT}" --licenses || true
+          # 安装 Platform 35 + Build-Tools 35.0.0
+          sdkmanager --sdk_root="${SDK_ROOT}" --install \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "platform-tools"
+          echo "==== SDK 目录结构 ===="
+          ls "${SDK_ROOT}/platforms/"
+          ls "${SDK_ROOT}/build-tools/"
+          # 写全局环境变量（后续步骤和 Gradle 都会读）
+          echo "ANDROID_HOME=${SDK_ROOT}" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=${SDK_ROOT}" >> "$GITHUB_ENV"
+
       # ===================== 3. 克隆 Media3 源码 (精确到 1.5.1 tag) =====================
       - name: "[Media3] 克隆 Media3 源码 (depth=1 加速，只拉 1.5.1 标签)"
         run: |
@@ -130,23 +164,47 @@ jobs:
           done
 
       # ===================== 6. 用 Gradle 编译 Media3 decoder_ffmpeg 模块 => AAR =====================
-      - name: "[Gradle] 编译 decoder_ffmpeg-release.aar"
+      - name: "[Gradle] 写 local.properties + 编译 decoder_ffmpeg-release.aar"
         timeout-minutes: 40
         run: |
           cd "${{ env.MEDIA3_CHECKOUT }}"
           chmod +x gradlew
-          echo "Gradle wrapper OK"
+
+          # 关键：Media3 是 Android Gradle 工程，根目录必须有 local.properties 指向 SDK
+          # (虽然 ANDROID_HOME 环境变量也生效，但 local.properties 是最稳妥的双保险)
+          cat > local.properties <<EOF
+          sdk.dir=${{ env.ANDROID_HOME }}
+          ndk.dir=${{ env.ANDROID_NDK_ROOT }}
+          EOF
+          echo "==== local.properties 内容 ===="
+          cat local.properties
+
+          # 限制 Gradle 堆内存（GitHub runner 只有 7GB 内存，默认 Xmx 太大容易 OOM 被杀）
+          export GRADLE_OPTS="-Xmx4g -XX:MaxMetaspaceSize=512m -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false"
           export JAVA_HOME="${JAVA_HOME_17_X64}"
+          export ANDROID_HOME="${{ env.ANDROID_HOME }}"
+          export ANDROID_SDK_ROOT="${{ env.ANDROID_HOME }}"
+          echo "JAVA_HOME=$JAVA_HOME"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "Free mem (before): $(free -h | grep Mem)"
+
+          # 只编 decoder_ffmpeg 模块的 release aar
+          #   -q  静默只输出错误
+          #   --no-daemon  跑一次就退出，不占内存
+          #   --stacktrace  如果失败就打印完整栈
           ./gradlew \
             :libraries:decoder_ffmpeg:assembleRelease \
             --no-daemon \
             --stacktrace \
-            -PdisablePreDex
+            --no-build-cache \
+            -PdisablePreDex \
+            -Pandroid.builder.sdkDownload=false
+
           echo "==== AAR 产物信息 ===="
           AAR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/build/outputs/aar/decoder_ffmpeg-release.aar"
           ls -lh "${AAR}"
-          echo "AAR 内部结构预览:"
-          unzip -l "${AAR}" | head -n 30
+          echo "AAR 内部结构预览（确认 4 套 ABI 的 .so 都在）:"
+          unzip -l "${AAR}"
 
       # ===================== 7. 上传 AAR 到 Actions Artifacts (可以下载 90 天) =====================
       - name: "[上传] 上传 AAR 到 Artifacts (点击 Actions 页下载)"
