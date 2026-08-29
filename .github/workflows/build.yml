@@ -1,4 +1,4 @@
-﻿name: Build Media3 FFmpeg Extension AAR (WMA/APE/AIFF + Container Demuxer)
+name: Build Media3 FFmpeg Extension AAR (WMA/APE/AIFF + Container Demuxer)
 
 # Trigger: push to main OR workflow_dispatch
 # 1. Push to main branch auto-triggers
@@ -321,6 +321,23 @@ jobs:
         run: |
           cd "${{ env.MEDIA3_CHECKOUT }}"
           chmod +x gradlew
+
+          echo "===== Patch settings.gradle to include decoder_ffmpeg ====="
+          SETTINGS_FILE="settings.gradle"
+          echo "Original settings.gradle last 5 lines:"
+          tail -n 5 "${SETTINGS_FILE}"
+          echo ""
+          echo "include ':lib-decoder-ffmpeg'" >> "${SETTINGS_FILE}"
+          echo "project(':lib-decoder-ffmpeg').projectDir = new File(rootDir, 'libraries/decoder_ffmpeg')" >> "${SETTINGS_FILE}"
+          echo ""
+          echo "Patched settings.gradle last 7 lines:"
+          tail -n 7 "${SETTINGS_FILE}"
+          echo ""
+          echo "===== Verify all referenced projects exist ====="
+          for d in libraries/common libraries/exoplayer libraries/decoder libraries/decoder_ffmpeg; do
+            if test -d "$d"; then echo "OK: $d exists"; else echo "FAIL: $d MISSING"; fi
+          done
+          echo ""
 
           SDK_ROOT="${{ env.ANDROID_HOME }}"
           NDK_DIR="${{ env.ANDROID_NDK_ROOT }}"
