@@ -23,7 +23,12 @@ jobs:
       #     为了彻底避免「sed 替换失效」这类脆弱操作，我们直接安装 r25b，和 Media3 期望完全一致。
       ANDROID_NDK_VERSION: "r25b"
       ANDROID_NDK_ACTUAL_VERSION: "25.1.8937393"
-      ANDROID_ABI_LEVEL: "24"                     # = 项目的 minSdk (build.gradle.kts: minSdk=24)
+      # ⚠️  必须用 21（和 Media3 constants.gradle 里 minSdkVersion=21 一致）！
+      #     之前误写成 24（项目自己的 minSdk=24），导致 FFmpeg 用 API 24 sysroot 编，
+      #     而 CMake 链接时 AGP 自动用 API 21 sysroot（因为 minSdkVersion=21），
+      #     两边 API 级别不一致时 NDK r25b 的 Bionic libc 对 stderr 符号/宏的处理方式不同，
+      #     加上 AGP 默认 -Wl,--no-undefined，直接导致「undefined symbol: stderr」链接失败（v6 的报错）。
+      ANDROID_ABI_LEVEL: "21"
       # 启用的 FFmpeg 音频解码器（对应 ffmpeg -decoders 里的名字）：
       #   ape            : Monkey's Audio 无损
       #   wmav1 wmav2    : WMA Standard (最常见)
@@ -37,6 +42,24 @@ jobs:
         pcm_s16be pcm_s16le pcm_u8 pcm_alaw pcm_mulaw pcm_f32be pcm_f32le
         mp3 mp3float flac vorbis opus alac aac aac_ltp ac3 eac3
     steps:
+
+      # ===================== 0. 磁盘瘦身（GitHub runner 默认 14GB，装完 SDK+NDK 后很容易爆） =====================
+      # 删掉 Ubuntu 预装但本项目完全不用的大软件：dotnet (~1.5GB)、ghc/Haskell (~1.5GB)、boost (~600MB)、android sdk 旧版本、swap 映像等，争取腾出 5~6GB
+      - name: "[磁盘] 瘦身：删除无用预装软件，腾出可用空间"
+        run: |
+          echo "--- 瘦身前磁盘 ---"
+          df -h /
+          echo "--- 删除 /usr/share/dotnet (1.5GB+) ---"
+          sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d/dotnet* 2>/dev/null || true
+          echo "--- 删除 /opt/ghc + /usr/local/share/boost + /opt/mssql-tools (2GB+) ---"
+          sudo rm -rf /opt/ghc /usr/local/share/boost /opt/mssql-tools /opt/hostedtoolcache/go /opt/hostedtoolcache/node /opt/hostedtoolcache/Python /opt/hostedtoolcache/Ruby /opt/hostedtoolcache/CodeQL 2>/dev/null || true
+          echo "--- 清理 apt 缓存 ---"
+          sudo apt-get clean -y && sudo apt-get autoremove -y 2>/dev/null || true
+          echo "--- 清理 /tmp 在之前 runner 残留的东西 ---"
+          sudo rm -rf /tmp/* /tmp/.??* 2>/dev/null || true
+          # 临时文件：ndk.zip, ffmpeg.tar.xz 等后面在 /tmp 下生成，构建完可以马上删
+          echo "--- 瘦身后磁盘 ---"
+          df -h /
 
       # ===================== 1. 环境准备 =====================
       - name: "[准备] 系统信息 + 剩余磁盘"
@@ -82,12 +105,15 @@ jobs:
           echo "ANDROID_NDK_ROOT=$NDK_DIR" >> "$GITHUB_ENV"
 
       # ===================== 2b. 安装 Android SDK (Gradle 编 AAR 必需) =====================
-      # Media3 1.5.1 的公共 build config（common_library_config.gradle）写死：
-      #   compileSdk = 35   → 需要装 Android SDK Platform 35
-      #   buildToolsVersion = "34.0.0"   → 必须精确装 Build-Tools 34.0.0（35.0.0 不行，AGP 会强校验版本号一致并报 Failed to find Build Tools revision 34.0.0）
-      #   外加 platform-tools（adb 等通用工具）
-      #   最后要接受 licenses，否则 Gradle 会拒绝
-      - name: "[Android SDK] 安装 cmdline-tools + Platform 35 + Build-Tools 34.0.0"
+      # Media3 1.5.1 公共 build config 硬编码（已读 constants.gradle + decoder_ffmpeg build.gradle + CMakeLists.txt 确认）：
+      #   compileSdk = 35                    → sdkmanager "platforms;android-35"
+      #   buildToolsVersion = "34.0.0"       → sdkmanager "build-tools;34.0.0"（AGP 强校验，大版本不兼容）
+      #   NDK 25.1.8937393 (r25b)           → 已在上面第 2 步单独装（Google 官方独立 zip）
+      #   CMakeLists.txt cmake_minimum_required(VERSION 3.21.0 FATAL_ERROR)
+      #     + android.externalNativeBuild.cmake.version = '3.21.0+'
+      #                                      → sdkmanager "cmake;3.22.1"（sdkmanager 提供的 3.22 满足 ≥3.21）
+      #   platform-tools（AGP 在打包阶段有时会调 adb 相关工具，没有也可能报错）
+      - name: "[Android SDK] 安装 cmdline-tools + Platform 35 + Build-Tools 34.0.0 + CMake 3.22.1"
         timeout-minutes: 15
         run: |
           set -eu
@@ -104,17 +130,26 @@ jobs:
           export PATH="${SDK_ROOT}/cmdline-tools/latest/bin:${SDK_ROOT}/platform-tools:${PATH}"
           # 接受全部 license（避免 Gradle 报告 license 未接受）
           yes | sdkmanager --sdk_root="${SDK_ROOT}" --licenses || true
-          # 安装 Platform 35 + Build-Tools 34.0.0（严格匹配 Media3 1.5.1 硬编码 buildToolsVersion） + platform-tools
+          # ⭐️ 一次性安装 Media3 1.5.1 需要的所有 SDK 组件（版本 100% 对齐源码硬编码）
           sdkmanager --sdk_root="${SDK_ROOT}" --install \
             "platforms;android-35" \
             "build-tools;34.0.0" \
+            "cmake;3.22.1" \
             "platform-tools"
-          echo "==== SDK 目录结构 ===="
+          echo "==== SDK 目录结构验证 ===="
+          echo "--- platforms ---"
           ls "${SDK_ROOT}/platforms/"
+          echo "--- build-tools ---"
           ls "${SDK_ROOT}/build-tools/"
+          echo "--- cmake (必须有 3.22.1 目录！) ---"
+          ls "${SDK_ROOT}/cmake/" 2>/dev/null || echo "(无 cmake 目录!! 安装失败)"
+          echo "--- cmake 版本验证 ---"
+          "${SDK_ROOT}/cmake/3.22.1/bin/cmake" --version | head -n1 || echo "(cmake 不可执行!!)"
           # 写全局环境变量（后续步骤和 Gradle 都会读）
           echo "ANDROID_HOME=${SDK_ROOT}" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=${SDK_ROOT}" >> "$GITHUB_ENV"
+          # 把 cmake/bin 也加到 PATH 里，gradle externalNativeBuild 查 PATH 找 cmake 更稳
+          echo "${SDK_ROOT}/cmake/3.22.1/bin" >> "$GITHUB_PATH"
 
       # ===================== 3. 克隆 Media3 源码 (精确到 1.5.1 tag) =====================
       - name: "[Media3] 克隆 Media3 源码 (depth=1 加速，只拉 1.5.1 标签)"
@@ -142,8 +177,22 @@ jobs:
       - name: "[FFmpeg] 链接 FFmpeg 源码到 Media3 decoder_ffmpeg/jni/ffmpeg"
         run: |
           FFMPEG_JNI_DIR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main/jni"
-          ln -sf /tmp/ffmpeg-6.0 "${FFMPEG_JNI_DIR}/ffmpeg"
+          # ⚠️ decoder_ffmpeg/build.gradle 第 30 行是「if (project.file('src/main/jni/ffmpeg').exists())」才启用 CMake
+          #    Gradle 里 Java File.exists() 对 symlink 通常会跟随，但为 100% 保险：
+          #    优先 ln -sf（省磁盘），失败就 cp -r（实体拷贝，一定 exists）—— 双保险。
+          rm -rf "${FFMPEG_JNI_DIR}/ffmpeg" 2>/dev/null || true
+          if ln -sf /tmp/ffmpeg-6.0 "${FFMPEG_JNI_DIR}/ffmpeg" && test -f "${FFMPEG_JNI_DIR}/ffmpeg/configure"; then
+            echo "INFO: 用 symlink 方式链接 FFmpeg 成功 (ln -s)"
+          else
+            echo "WARN: symlink 未生效或 Gradle File.exists 可能不跟随，改用 cp -r 实体拷贝（多用 100MB 磁盘，保证 100% exists）"
+            rm -rf "${FFMPEG_JNI_DIR}/ffmpeg"
+            cp -r /tmp/ffmpeg-6.0 "${FFMPEG_JNI_DIR}/ffmpeg"
+          fi
+          echo "--- Gradle 视角下 src/main/jni/ffmpeg 是否存在 ---"
+          test -d "${FFMPEG_JNI_DIR}/ffmpeg" && echo "YES 目录存在" || echo "NO 目录不存在(致命)"
           ls -la "${FFMPEG_JNI_DIR}/ffmpeg/configure"
+          # build_ffmpeg.sh 会把静态库编译输出到 jni/ffmpeg/android-libs/<ABI>/*.a
+          # 等编完要确认 libavcodec.a 在对应目录，不然 CMake IMPORTED_LOCATION 找不到
 
       # ===================== 5. 执行 build_ffmpeg.sh 编译 FFmpeg 静态库 (.a) =====================
       # 这是最耗时的步骤：configure + make 要跑 4 套 ABI (armv7/arm64/x86/x86_64)
@@ -170,86 +219,162 @@ jobs:
           done
 
       # ===================== 6. 用 Gradle 编译 Media3 decoder_ffmpeg 模块 => AAR =====================
-      - name: "[Gradle] 写 local.properties + 编译 decoder_ffmpeg-release.aar"
+      - name: "[Gradle] 写 local.properties + patch CMakeLists + 编译 decoder_ffmpeg-release.aar"
         timeout-minutes: 40
         run: |
           cd "${{ env.MEDIA3_CHECKOUT }}"
           chmod +x gradlew
 
-          # 关键：Media3 是 Android Gradle 工程，根目录必须有 local.properties 指向 SDK
-          # (虽然 ANDROID_HOME 环境变量也生效，但 local.properties 是最稳妥的双保险)
-          cat > local.properties <<EOF
-          sdk.dir=${{ env.ANDROID_HOME }}
-          ndk.dir=${{ env.ANDROID_NDK_ROOT }}
-          EOF
-          echo "==== local.properties 内容 ===="
-          cat local.properties
+          # ══════════════════════════════════════════════════════════
+          # Patch 1: CMakeLists.txt — 关闭 AGP 默认加的 -Wl,--no-undefined
+          # ══════════════════════════════════════════════════════════
+          # NDK r25b 的 Bionic libc 不再导出全局符号 `stderr`（它是 <stdio.h> 里的宏），
+          # 但 FFmpeg 6.0 的 libavutil.a (log.c) 直接引用了 stderr 作为符号，
+          # 加上 AGP 默认 -Wl,--no-undefined，导致链接 .so 时报
+          #   ld: error: undefined symbol: stderr  (referenced by libavutil/log.c)
+          # 解决：追加一行 target_link_options 覆盖 --no-undefined，
+          # 让链接器容忍这个未解析符号（运行时 Bionic 动态链接器会处理）。
+          CMAKEFILE="libraries/decoder_ffmpeg/src/main/jni/CMakeLists.txt"
+          echo "--- Patch 1: 追加 link flag 关闭 --no-undefined ---"
+          echo "原始 CMakeLists.txt 末尾："
+          tail -n 5 "${CMAKEFILE}"
+          # 用 python 追加比 shell heredoc 更稳（避免 YAML 缩进污染）
+          python3 -c "
+import sys
+with open('${CMAKEFILE}', 'a') as f:
+    f.write('\n')
+    f.write('# PATCH: fix NDK r25b Bionic stderr undefined symbol (--no-undefined)\\n')
+    f.write('target_link_options(ffmpegJNI PRIVATE \"-Wl,--no-undefined=false\")\\n')
+    f.write('# PATCH: also add -llog explicitly and -landroid_log for robustness\\n')
+    f.write('target_link_libraries(ffmpegJNI PRIVATE log)\\n')
+"
+          echo "Patch 后 CMakeLists.txt 末尾："
+          tail -n 10 "${CMAKEFILE}"
+          grep -q "no-undefined=false" "${CMAKEFILE}" && echo "✅ patch 1 生效" || echo "❌ patch 1 失败"
 
-          # 限制 Gradle 堆内存（GitHub runner 只有 7GB 内存，默认 Xmx 太大容易 OOM 被杀）
+          # ══════════════════════════════════════════════════════════
+          # 强校验 CMake 静态库位置（CMakelists.txt 第 25 行写死的查找路径！）
+          #   CMakeLists: set(ffmpeg_binaries "${CMAKE_CURRENT_SOURCE_DIR}/ffmpeg/android-libs/${ANDROID_ABI}")
+          #   要求: jni/ffmpeg/android-libs/arm64-v8a/libavcodec.a 等必须存在
+          # ══════════════════════════════════════════════════════════
+          FFMPEG_JNI_DIR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main/jni"
+          echo "==== 强校验: 4 套 ABI 的 libavcodec.a 必须存在 ===="
+          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+            LIBAV="${FFMPEG_JNI_DIR}/ffmpeg/android-libs/$abi/libavcodec.a"
+            if test -f "$LIBAV"; then
+              echo "OK  $abi: $LIBAV ($(du -h $LIBAV | cut -f1))"
+            else
+              echo "FATAL $abi: $LIBAV 不存在! CMake 链接 IMPORTED_LOCATION 失败，生成的 AAR 不会有 .so"
+              exit 2
+            fi
+          done
+
+          # ══════════════════════════════════════════════════════════
+          # local.properties：给 Android Gradle Plugin 指 SDK/NDK/CMake 位置
+          #   AGP 读取顺序：local.properties → ANDROID_HOME env → SDK location registry
+          #   sdk.dir    : 必填（AGP 8.3 必查）
+          #   ndk.dir    : 必填（CXX11041 强校验版本 25.1.8937393）
+          #   cmake.dir  : 非必填，但加了能让 AGP 发现 cmake 更稳（不需要再扫 SDK 里其他 cmake 版本）
+          # ══════════════════════════════════════════════════════════
+          SDK_ROOT="${{ env.ANDROID_HOME }}"
+          NDK_DIR="${{ env.ANDROID_NDK_ROOT }}"
+          CMAKE_DIR="${SDK_ROOT}/cmake/3.22.1"
+          cat > local.properties <<EOF
+          sdk.dir=$SDK_ROOT
+          ndk.dir=$NDK_DIR
+          cmake.dir=$CMAKE_DIR
+          EOF
+          # ⚠️  上面的 cat heredoc 因为 YAML 缩进可能每行前有空格。所以用 printf 重写一次，严格无空格：
+          printf 'sdk.dir=%s\nndk.dir=%s\ncmake.dir=%s\n' \
+            "$SDK_ROOT" "$NDK_DIR" "$CMAKE_DIR" > local.properties
+          echo "==== local.properties 内容（逐字节 cat -A 看有没有多余空格）===="
+          cat -A local.properties
+
+          # ══════════════════════════════════════════════════════════
+          # Gradle 环境变量 & 网路参数
+          # ══════════════════════════════════════════════════════════
+          # Gradle heap：GitHub runner 7GB 内存，给 4GB heap + 512MB metaspace 够
           export GRADLE_OPTS="-Xmx4g -XX:MaxMetaspaceSize=512m -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false"
+          # org.gradle.internal.http.connectionTimeout / socketTimeout 5 分钟 + 重试 3 次（防 Google Maven/central 偶发超时）
+          export GRADLE_PROPERTIES_EXTRA="-Dorg.gradle.internal.http.connectionTimeout=300000 -Dorg.gradle.internal.http.socketTimeout=300000"
+          export GRADLE_OPTS="$GRADLE_OPTS $GRADLE_PROPERTIES_EXTRA"
           export JAVA_HOME="${JAVA_HOME_17_X64}"
-          export ANDROID_HOME="${{ env.ANDROID_HOME }}"
-          export ANDROID_SDK_ROOT="${{ env.ANDROID_HOME }}"
+          export ANDROID_HOME="$SDK_ROOT"
+          export ANDROID_SDK_ROOT="$SDK_ROOT"
+          # 加到 PATH：cmake + ndk-build (cmake 已经通过 GITHUB_PATH 加过，这里再加一次双保险)
+          export PATH="${CMAKE_DIR}/bin:${NDK_DIR}:${SDK_ROOT}/cmdline-tools/latest/bin:${SDK_ROOT}/build-tools/34.0.0:${SDK_ROOT}/platform-tools:${PATH}"
           echo "JAVA_HOME=$JAVA_HOME"
           echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "CMAKE_DIR=$CMAKE_DIR  cmake --version: $(cmake --version 2>/dev/null | head -n1)"
           echo "Free mem (before): $(free -h | grep Mem)"
+          echo "Disk free /tmp & /opt: $(df -h / /tmp 2>/dev/null | grep -v Filesystem)"
 
-          # ------------------------------------------------------------
-          # 关键一步：先列出所有 Gradle 子项目，确认真实的 decoder_ffmpeg 模块名
-          #   (旧的 Media3 可能叫 ':libraries:decoder_ffmpeg'，新版可能叫别的，
-          #    比如 ':decoder_ffmpeg' / ':media3-decoder-ffmpeg' 等，
-          #    必须以 Gradle 自己打印出的 projects 列表为准，避免报 project not found)
-          # ------------------------------------------------------------
+          # ══════════════════════════════════════════════════════════
+          # 先用 gradlew projects 列出所有子模块，正则匹配含 decoder & ffmpeg 的那个
+          #   (Media3 settings.gradle 最后一行 apply from: 'core_settings.gradle' 里定义了真正的 include 名字)
+          # ══════════════════════════════════════════════════════════
           echo "===== Gradle 项目所有子模块列表 ====="
-          ./gradlew projects --no-daemon 2>&1 | tee /tmp/gradle_projects.log
+          ./gradlew projects --no-daemon 2>&1 | tee /tmp/gradle_projects.log || echo "(gradlew projects 本身失败了？看上面的日志)"
           echo "===== 过滤出和 decoder/ffmpeg 相关的子模块 ====="
-          grep -i "decoder\|ffmpeg" /tmp/gradle_projects.log || true
+          grep -oiE ":[A-Za-z0-9_:-]*decoder[A-Za-z0-9_:-]*ffmpeg[A-Za-z0-9_:-]*" /tmp/gradle_projects.log || true
+          grep -oiE ":[A-Za-z0-9_:-]*ffmpeg[A-Za-z0-9_:-]*decoder[A-Za-z0-9_:-]*" /tmp/gradle_projects.log || true
 
-          # ------------------------------------------------------------
-          # 自动匹配正确的子模块名：优先匹配 ':libraries:decoder_ffmpeg'，
-          # 没匹配到就取所有模块名里包含 'decoder' 且包含 'ffmpeg' 的第一个
-          # ------------------------------------------------------------
           TARGET_PROJECT=$( \
             grep -oE ":[^[:space:]]+" /tmp/gradle_projects.log \
               | grep -i "decoder" \
               | grep -i "ffmpeg" \
+              | sort -u \
               | head -n1 )
           if [ -z "$TARGET_PROJECT" ]; then
-            echo "ERROR: 没找到 decoder_ffmpeg 子模块！上面的 projects 列表里找看看是不是名字变了"
+            echo "ERROR: 没找到 decoder_ffmpeg 子模块！检查上面 projects 输出（第 5 次成功 run 显示应该是 :lib-decoder-ffmpeg）"
             exit 1
           fi
           echo ">>>>>> 最终编的子模块是: $TARGET_PROJECT"
 
-          # ------------------------------------------------------------
-          # 只编目标模块的 release aar
-          #   --no-daemon  跑一次就退出，不占内存
-          #   --stacktrace  如果失败就打印完整栈
-          # ------------------------------------------------------------
+          # ══════════════════════════════════════════════════════════
+          # 汇编 release AAR
+          # ══════════════════════════════════════════════════════════
           ./gradlew \
             ${TARGET_PROJECT}:assembleRelease \
             --no-daemon \
             --stacktrace \
             --no-build-cache \
+            --no-configuration-cache \
             -PdisablePreDex \
             -Pandroid.builder.sdkDownload=false
 
-          # ------------------------------------------------------------
-          # 找 AAR 产物（不硬编码路径，子模块名不一样 build 输出路径也不一样）
-          #   规则：找所有 build/outputs/aar/ 下名字包含 release 的 aar 文件，取最大那个
-          # ------------------------------------------------------------
+          # ══════════════════════════════════════════════════════════
+          # 找 AAR + 强校验 AAR 里必须有 4 套 ABI 的 libffmpegJNI.so
+          #   （没装 CMake 时也能「编出 AAR」，但 AAR 里没有 jni/*.so，手机上必崩，所以这里一定要强校验）
+          # ══════════════════════════════════════════════════════════
           echo "==== AAR 产物搜索结果 ===="
-          AAR_CANDIDATES=($(find "${{ env.MEDIA3_CHECKOUT }}" \
-                              -type f -path "*/build/outputs/aar/*release*.aar" 2>/dev/null))
+          mapfile -t AAR_CANDIDATES < <(find "${{ env.MEDIA3_CHECKOUT }}" \
+                              -type f -path "*/build/outputs/aar/*release*.aar" 2>/dev/null)
           if [ ${#AAR_CANDIDATES[@]} -eq 0 ]; then
-            echo "ERROR: 没找到任何 release aar！检查上面 Gradle 构建是否成功"
+            echo "ERROR: 没找到任何 release aar！检查 Gradle assembleRelease 是否成功"
             exit 1
           fi
-          # 按文件大小降序排列，最大的就是带所有 ABI 的正式 release AAR
-          AAR=$(ls -1S "${AAR_CANDIDATES[@]}" 2>/dev/null | head -n1)
+          # 按文件大小降序，取最大那个
+          AAR=$(ls -1S "${AAR_CANDIDATES[@]}" | head -n1)
           echo ">>>>>> 最终选中的 AAR: $AAR"
           ls -lh "${AAR}"
-          echo "AAR 内部结构预览（确认 4 套 ABI 的 .so 都在）:"
+          echo "==== AAR 内部结构预览 (重点看 jni/ 下的 .so) ===="
           unzip -l "${AAR}"
+          echo "===== 强校验: 4 套 ABI 的 libffmpegJNI.so 必须存在 ====="
+          MISSING=0
+          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+            if unzip -l "$AAR" | grep -q "jni/$abi/libffmpegJNI.so"; then
+              echo "OK  jni/$abi/libffmpegJNI.so 存在"
+            else
+              echo "FATAL jni/$abi/libffmpegJNI.so 缺失! 说明 externalNativeBuild/CMake 没跑通（很可能是 cmake 版本问题或 ffmpeg 静态库路径不对）"
+              MISSING=1
+            fi
+          done
+          if [ "$MISSING" = "1" ]; then
+            echo "--- 打印 Gradle 的 CMake 构建日志（如果存在）---"
+            find "${{ env.MEDIA3_CHECKOUT }}" -name "cmake_build.log" -o -name "*.cxx" -type d 2>/dev/null | head -n 10
+            exit 3
+          fi
           # 把 AAR 路径写入共享环境变量，后续上传/发布步骤引用
           echo "FINAL_AAR_PATH=$AAR" >> "$GITHUB_ENV"
 
