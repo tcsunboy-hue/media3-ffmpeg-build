@@ -238,19 +238,16 @@ jobs:
           echo "--- Patch 1: 追加 link flag 关闭 --no-undefined ---"
           echo "原始 CMakeLists.txt 末尾："
           tail -n 5 "${CMAKEFILE}"
-          # 用 python 追加比 shell heredoc 更稳（避免 YAML 缩进污染）
-          python3 -c "
-import sys
-with open('${CMAKEFILE}', 'a') as f:
-    f.write('\n')
-    f.write('# PATCH: fix NDK r25b Bionic stderr undefined symbol (--no-undefined)\\n')
-    f.write('target_link_options(ffmpegJNI PRIVATE \"-Wl,--no-undefined=false\")\\n')
-    f.write('# PATCH: also add -llog explicitly and -landroid_log for robustness\\n')
-    f.write('target_link_libraries(ffmpegJNI PRIVATE log)\\n')
-"
+          # 用 printf + >> 追加最简单，避开 Python/heredoc 在 YAML run 块里的引号嵌套地狱
+          # 每一行就是一个独立 shell 命令，没有任何引号嵌套，GitHub Actions YAML 不会炸
+          printf '\n' >> "${CMAKEFILE}"
+          printf '# PATCH: fix NDK r25b Bionic stderr undefined symbol\n' >> "${CMAKEFILE}"
+          printf 'target_link_options(ffmpegJNI PRIVATE "-Wl,--no-undefined=false")\n' >> "${CMAKEFILE}"
+          printf '# PATCH: explicitly link log library for robustness\n' >> "${CMAKEFILE}"
+          printf 'target_link_libraries(ffmpegJNI PRIVATE log)\n' >> "${CMAKEFILE}"
           echo "Patch 后 CMakeLists.txt 末尾："
           tail -n 10 "${CMAKEFILE}"
-          grep -q "no-undefined=false" "${CMAKEFILE}" && echo "✅ patch 1 生效" || echo "❌ patch 1 失败"
+          grep -q 'no-undefined=false' "${CMAKEFILE}" && echo "✅ patch 1 生效" || echo "❌ patch 1 失败"
 
           # ══════════════════════════════════════════════════════════
           # 强校验 CMake 静态库位置（CMakelists.txt 第 25 行写死的查找路径！）
