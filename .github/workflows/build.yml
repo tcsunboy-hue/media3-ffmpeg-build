@@ -179,6 +179,24 @@ jobs:
           echo "==== local.properties 内容 ===="
           cat local.properties
 
+          # ============================================================
+          # 修复 [CXX11041] 版本冲突：Media3 1.5.1 硬编码 android.ndkVersion=25.1.8937393 (= r25b)
+          # 而我们安装的是 NDK r25c，版本号=25.2.9519653。
+          # 解法：把 Media3 所有 .gradle 配置文件里写死的 ndk 版本号替换成 r25c 的版本号
+          # (r25b/r25c 仅小 bugfix，API/ABI 完全兼容，FFmpeg 已用 r25c 成功编过静态库)
+          # ============================================================
+          EXPECTED_BY_MEDIA3="25.1.8937393"      # Media3 1.5.1 写死的版本(r25b)
+          INSTALLED_NDK_VERSION="25.2.9519653"   # 我们实际装的 r25c 实际版本号
+          # 先定位哪个文件里有这个版本号（调试用）
+          echo "==== 查有哪些文件写了 ndk 版本号 $EXPECTED_BY_MEDIA3 ===="
+          grep -rn "$EXPECTED_BY_MEDIA3" --include="*.gradle" --include="*.gradle.kts" . || true
+          # 批量做字符串替换
+          find . -type f \( -name "*.gradle" -o -name "*.gradle.kts" \) \
+            -exec sed -i "s/${EXPECTED_BY_MEDIA3}/${INSTALLED_NDK_VERSION}/g" {} +
+          # 确认替换成功
+          echo "==== 替换后再次检查（应该没有了） ===="
+          grep -rn "$EXPECTED_BY_MEDIA3" --include="*.gradle" . || echo "（已全部替换）"
+
           # 限制 Gradle 堆内存（GitHub runner 只有 7GB 内存，默认 Xmx 太大容易 OOM 被杀）
           export GRADLE_OPTS="-Xmx4g -XX:MaxMetaspaceSize=512m -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false"
           export JAVA_HOME="${JAVA_HOME_17_X64}"
