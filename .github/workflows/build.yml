@@ -355,8 +355,14 @@ jobs:
           TARGET_PROJECT=":lib-decoder-ffmpeg"
           echo "Target module: ${TARGET_PROJECT}"
 
+          echo "===== gradlew projects ====="
+          ./gradlew projects --no-daemon 2>&1 | tail -n 30
+          echo ""
           echo "===== dry-run verify ====="
-          ./gradlew "${TARGET_PROJECT}:assembleRelease" --dry-run --no-daemon 2>&1 | tail -n 10
+          ./gradlew "${TARGET_PROJECT}:assembleRelease" --dry-run --no-daemon 2>&1 | tee /tmp/gradle_dryrun.log | tail -n 30
+          echo ""
+          echo "===== full dry-run log ====="
+          cat /tmp/gradle_dryrun.log
 
           echo "===== Building assembleRelease ====="
           ./gradlew "${TARGET_PROJECT}:assembleRelease" \
