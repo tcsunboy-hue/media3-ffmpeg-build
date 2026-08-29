@@ -1,8 +1,8 @@
 ﻿name: Build Media3 FFmpeg Extension AAR (WMA/APE/AIFF + Container Demuxer)
 
-# 瑙﹀彂鏂瑰紡锛?
-# 1. 涓婁紶鏂囦欢鍒?main 鍒嗘敮鍚庤嚜鍔ㄥ紑濮?
-# 2. 涔熷彲浠ュ湪 Actions 椤甸潰鎵嬪姩鐐瑰嚮 Run workflow
+# Trigger: push to main OR workflow_dispatch
+# 1. Push to main branch auto-triggers
+# 2. Can also manually run from Actions tab
 #
 # 猸愶笍 鏈鏋勫缓鐩告瘮 v10 鏂板锛?
 #   - 绉婚櫎 build_ffmpeg.sh 閲岀‖缂栫爜鐨?--disable-avformat
@@ -56,7 +56,7 @@ jobs:
     steps:
 
       # ===================== 0. 纾佺洏鐦﹁韩 =====================
-      - name: "[纾佺洏] 鐦﹁韩锛氬垹闄ゆ棤鐢ㄩ瑁呰蒋浠讹紝鑵惧嚭鍙敤绌洪棿"
+      - name: "[Cleanup] Free disk space"
         run: |
           echo "=== Disk space before cleanup ==="
           df -h /
@@ -68,7 +68,7 @@ jobs:
           df -h /
 
       # ===================== 1. 鐜鍑嗗 =====================
-      - name: "[鍑嗗] 绯荤粺淇℃伅 + 瀹夎鍩虹鏋勫缓宸ュ叿"
+      - name: "[Setup] System info + build tools"
         run: |
           echo "OS: $(uname -a)"
           echo "CPU cores: $(nproc)"
@@ -80,14 +80,14 @@ jobs:
             nasm pkg-config python3 python3-distutils
           echo "make: $(make --version | head -n1)"
 
-      - name: "[鍑嗗] 瀹夎 JDK 17"
+      - name: "[Setup] Install JDK 17"
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
           java-version: "17"
 
       # ===================== 2. 涓嬭浇 Android NDK r25b =====================
-      - name: "[NDK] 涓嬭浇骞惰В鍘?NDK r25b"
+      - name: "[NDK] Download and extract NDK r25b"
         run: |
           cd /tmp
           wget -q --show-progress \
@@ -100,7 +100,7 @@ jobs:
           echo "ANDROID_NDK_ROOT=$NDK_DIR" >> "$GITHUB_ENV"
 
       # ===================== 2b. 瀹夎 Android SDK =====================
-      - name: "[Android SDK] 瀹夎 cmdline-tools + Platform 35 + Build-Tools 34.0.0 + CMake 3.22.1"
+      - name: "[Android SDK] Install SDK + CMake"
         timeout-minutes: 15
         run: |
           set -eu
@@ -124,7 +124,7 @@ jobs:
           echo "${SDK_ROOT}/cmake/3.22.1/bin" >> "$GITHUB_PATH"
 
       # ===================== 3. 鍏嬮殕 Media3 婧愮爜 =====================
-      - name: "[Media3] 鍏嬮殕 Media3 1.5.1 婧愮爜"
+      - name: "[Media3] Checkout Media3 1.5.1"
         run: |
           cd /tmp
           git clone --depth 1 --branch "${{ env.MEDIA3_TAG }}" \
@@ -135,7 +135,7 @@ jobs:
           ls -la libraries/decoder_ffmpeg/src/main/jni/
 
       # ===================== 4. 涓嬭浇 FFmpeg 6.0 婧愮爜骞堕摼鎺?=====================
-      - name: "[FFmpeg] 涓嬭浇 FFmpeg 6.0 婧愮爜"
+      - name: "[FFmpeg] Download FFmpeg 6.0"
         run: |
           cd /tmp
           wget -q --show-progress "https://ffmpeg.org/releases/ffmpeg-6.0.tar.xz" -O ffmpeg-6.0.tar.xz
@@ -143,7 +143,7 @@ jobs:
           tar xf ffmpeg-6.0.tar.xz
           test -f ffmpeg-6.0/configure && echo "OK: ffmpeg-6.0/configure exists" || echo "FAIL: extraction failed"
 
-      - name: "[FFmpeg] 閾炬帴 FFmpeg 婧愮爜鍒?jni/ffmpeg 鐩綍"
+      - name: "[FFmpeg] Symlink to jni/ffmpeg"
         run: |
           FFMPEG_JNI_DIR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main/jni"
           rm -rf "${FFMPEG_JNI_DIR}/ffmpeg" 2>/dev/null || true
@@ -164,7 +164,7 @@ jobs:
       #   1) 鍒犳帀 --disable-avformat
       #   2) 鍔犱笂 demuxer/parser/protocol/bsf 鐨?--enable 閫夐」
       # 杩欐牱 make 鎵嶄細鐢熸垚 libavformat.a
-      - name: "[Patch FFmpeg] 淇敼 build_ffmpeg.sh 鍚敤 avformat + demuxer"
+      - name: "[Patch FFmpeg] Enable avformat in build_ffmpeg.sh"
         run: |
           FFMPEG_JNI_DIR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main/jni"
           PATCHED_SH="${FFMPEG_JNI_DIR}/build_ffmpeg.sh"
@@ -196,7 +196,7 @@ jobs:
       # 鍥犱负 build_ffmpeg.sh 鐨?COMMON_OPTIONS 涓嶆敮鎸?demuxer/parser 鍙傛暟
       # 鎴戜滑鍦ㄦ瘡娆?./configure 璋冪敤鏃舵墜鍔ㄨ拷鍔?--enable-demuxer=xxx 绛夊弬鏁?
       # 鍏蜂綋鍋氭硶锛氱洿鎺ヤ慨鏀硅剼鏈紝鍦ㄦ瘡涓?${COMMON_OPTIONS} 鍚庨潰杩藉姞鎴戜滑鐨?FLAGS
-      - name: "[Patch FFmpeg] 杩藉姞 demuxer/parser/bsf/protocol 鍒?configure 鍛戒护"
+      - name: "[Patch FFmpeg] Append demuxer/parser flags"
         run: |
           FFMPEG_JNI_DIR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main/jni"
           PATCHED_SH="${FFMPEG_JNI_DIR}/build_ffmpeg.sh"
@@ -218,7 +218,7 @@ jobs:
           grep "enable-demuxer=asf" "${PATCHED_SH}" && echo "  OK: --enable-demuxer=asf added" || echo "  FAIL: not found"
 
       # ===================== 5c. 猸愶笍 杩愯淇敼鍚庣殑 build_ffmpeg.sh 缂栬瘧 FFmpeg =====================
-      - name: "[FFmpeg 缂栬瘧] 鏋勫缓鍏ㄩ儴 4 濂?ABI 鐨?FFmpeg 闈欐€佸簱 (鍚?libavformat.a)"
+      - name: "[FFmpeg Build] Build 4 ABI static libs"
         timeout-minutes: 140
         run: |
           FFMPEG_MODULE_PATH="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main"
@@ -262,7 +262,7 @@ jobs:
           head -5 "${DEMUX_JNI}"
 
       # ===================== 6. 猸愶笍 Patch CMakeLists.txt + 缂栬瘧 AAR =====================
-      - name: "[Gradle] Patch CMakeLists.txt 鍔?avformat + demux_jni.cc + 缂栬瘧 AAR"
+      - name: "[Gradle Patch] Patch CMakeLists.txt (avformat + demux_jni.cc)"
         timeout-minutes: 40
         run: |
           echo "========= STEP START: Gradle CMake patch ========="
@@ -314,24 +314,29 @@ jobs:
           done
           echo ""
           echo "========= PATCH STEP DONE ========="
-          # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
-          # 鍐?local.properties + Gradle 缂栬瘧
-          # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
+
+      # ===================== 7. Build AAR with Gradle =====================
+      - name: "[Gradle Build] Compile AAR with Gradle"
+        timeout-minutes: 40
+        run: |
+          cd "${{ env.MEDIA3_CHECKOUT }}"
+          chmod +x gradlew
+
           SDK_ROOT="${{ env.ANDROID_HOME }}"
           NDK_DIR="${{ env.ANDROID_NDK_ROOT }}"
           CMAKE_DIR="${SDK_ROOT}/cmake/3.22.1"
           printf 'sdk.dir=%s\nndk.dir=%s\ncmake.dir=%s\n' \
-            "$SDK_ROOT" "$NDK_DIR" "$CMAKE_DIR" > local.properties
+            "${SDK_ROOT}" "${NDK_DIR}" "${CMAKE_DIR}" > local.properties
           cat -A local.properties
 
           export GRADLE_OPTS="-Xmx4g -XX:MaxMetaspaceSize=512m -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false"
           export JAVA_HOME="${JAVA_HOME_17_X64}"
-          export ANDROID_HOME="$SDK_ROOT"
-          export ANDROID_SDK_ROOT="$SDK_ROOT"
+          export ANDROID_HOME="${SDK_ROOT}"
+          export ANDROID_SDK_ROOT="${SDK_ROOT}"
           export PATH="${CMAKE_DIR}/bin:${NDK_DIR}:${SDK_ROOT}/cmdline-tools/latest/bin:${SDK_ROOT}/build-tools/34.0.0:${SDK_ROOT}/platform-tools:${PATH}"
 
           TARGET_PROJECT=":lib-decoder-ffmpeg"
-          echo "Target module: $TARGET_PROJECT"
+          echo "Target module: ${TARGET_PROJECT}"
 
           echo "===== dry-run verify ====="
           ./gradlew "${TARGET_PROJECT}:assembleRelease" --dry-run --no-daemon 2>&1 | tail -n 10
@@ -341,64 +346,49 @@ jobs:
             --no-daemon --stacktrace --no-build-cache --no-configuration-cache \
             -PdisablePreDex -Pandroid.builder.sdkDownload=false
 
-          # 鎵?AAR
           EXPECTED_AAR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/build/outputs/aar/lib-decoder-ffmpeg-release.aar"
-          if [ -f "$EXPECTED_AAR" ]; then
-            AAR="$EXPECTED_AAR"
+          if [ -f "${EXPECTED_AAR}" ]; then
+            AAR="${EXPECTED_AAR}"
           else
             AAR=$(find "${{ env.MEDIA3_CHECKOUT }}" -name "*.aar" -path "*release*" -print 2>/dev/null | head -n1)
           fi
           echo ""
           echo "===== AAR found ====="
-          echo "AAR=$AAR"
-          ls -lh "$AAR"
+          echo "AAR=${AAR}"
+          ls -lh "${AAR}"
 
-          # 楠岃瘉 AAR 鍐呭
           echo ""
           echo "===== AAR internal structure ====="
           unzip -l "${AAR}" | head -n 40
 
-          # 鍏抽敭楠岃瘉锛?so 鏄惁鍖呭惈 avformat 绗﹀彿
           echo ""
           echo "===== Sanity-check: .so must link avformat symbols ====="
           TMPDIR=$(mktemp -d)
-          cd "$TMPDIR"
+          cd "${TMPDIR}"
           unzip -q "${AAR}" "jni/*/libffmpegJNI.so" 2>/dev/null
+          NM="${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
           for abi in armeabi-v7a arm64-v8a x86 x86_64; do
-            SO="jni/$abi/libffmpegJNI.so"
-            if [ -f "$SO" ]; then
-              echo "--- $abi ---"
-              echo "  size: $(ls -lh $SO | cut -f5)"
-              # 鐢?ndk 鐨?llvm-nm 妫€鏌?avformat 绗﹀彿
-              NM="${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
-              if [ -f "$NM" ]; then
-                AVFMT_SYMS=$("$NM" "$SO" 2>/dev/null | grep -c "avformat_" || true)
-                echo "  avformat_ symbols: $AVFMT_SYMS"
-                if [ "$AVFMT_SYMS" -gt 0 ]; then
-                  echo "  OK: avformat linked"
-                else
-                  echo "  FAIL: avformat not linked"
-                fi
-                # 妫€鏌ユ垜浠殑 demux JNI 鍑芥暟
-                DEMUX_SYMS=$("$NM" "$SO" 2>/dev/null | grep -c "Java_com_wmplay_extractor_FfmpegExtractor" || true)
-                echo "  demux JNI symbols: $DEMUX_SYMS"
-                if [ "$DEMUX_SYMS" -gt 0 ]; then
-                  echo "  OK: demux JNI functions exported"
-                else
-                  echo "  FAIL: demux JNI functions not exported"
-                fi
-              fi
+            SO="jni/${abi}/libffmpegJNI.so"
+            if [ -f "${SO}" ]; then
+              echo "--- ${abi} ---"
+              echo "  size: $(ls -lh "${SO}" | cut -f5)"
+              AVFMT_SYMS=$("${NM}" "${SO}" 2>/dev/null | grep -c "avformat_" || true)
+              echo "  avformat_ symbols: ${AVFMT_SYMS}"
+              [ "${AVFMT_SYMS}" -gt 0 ] && echo "  OK: avformat linked" || echo "  FAIL: avformat not linked"
+              DEMUX_SYMS=$("${NM}" "${SO}" 2>/dev/null | grep -c "Java_com_wmplay_extractor_FfmpegExtractor" || true)
+              echo "  demux JNI symbols: ${DEMUX_SYMS}"
+              [ "${DEMUX_SYMS}" -gt 0 ] && echo "  OK: demux JNI exported" || echo "  FAIL: demux JNI missing"
             else
-              echo "FAIL: $abi/libffmpegJNI.so missing"
+              echo "FAIL: ${abi}/libffmpegJNI.so missing"
             fi
           done
           cd /
-          rm -rf "$TMPDIR"
+          rm -rf "${TMPDIR}"
 
-          echo "FINAL_AAR_PATH=$AAR" >> "$GITHUB_ENV"
+          echo "FINAL_AAR_PATH=${AAR}" >> "$GITHUB_ENV"
 
       # ===================== 7. 涓婁紶 AAR 鍒?Artifacts =====================
-      - name: "[涓婁紶] 涓婁紶 AAR 鍒?Actions Artifacts"
+      - name: "[Upload] Upload AAR to Actions Artifacts"
         uses: actions/upload-artifact@v4
         with:
           name: "decoder_ffmpeg_with_demux-media3-1.5.1"
@@ -408,7 +398,7 @@ jobs:
           if-no-files-found: error
 
       # ===================== 8. 鍙戝竷鍒?Release =====================
-      - name: "[鍙戝竷] 涓婁紶 AAR 鍒?GitHub Release"
+      - name: "[Release] Upload AAR to GitHub Release"
         uses: softprops/action-gh-release@v2
         if: success()
         with:
