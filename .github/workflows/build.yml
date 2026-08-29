@@ -1,0 +1,195 @@
+name: Build Media3 FFmpeg Extension AAR (for WMA/APE/AIFF)
+
+# 触发方式：
+# 1. 上传文件到 main 分支后自动开始
+# 2. 也可以在 Actions 页面手动点击 Run workflow
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+# GitHub Actions 免费 Linux 机器：2~4 核 CPU，7GB 内存，14GB 磁盘
+# 全部编译流程约 30~60 分钟（主要耗时在 FFmpeg configure + make）
+jobs:
+  build-aar:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180   # 最多允许跑 3 小时，防止卡死
+    env:
+      MEDIA3_TAG: "1.5.1"                        # 和项目 build.gradle 中的 media3 版本一致
+      ANDROID_NDK_VERSION: "r25c"                 # Media3 官方推荐 NDK r25
+      ANDROID_ABI_LEVEL: "24"                     # = 项目的 minSdk (build.gradle.kts: minSdk=24)
+      # 启用的 FFmpeg 音频解码器（对应 ffmpeg -decoders 里的名字）：
+      #   ape            : Monkey's Audio 无损
+      #   wmav1 wmav2    : WMA Standard (最常见)
+      #   wmapro         : WMA Professional
+      #   wmalossless    : WMA Lossless 无损
+      #   pcm_s16be/pcm_s16le/pcm_alaw 等 : AIFF/AIF 容器里的 PCM 数据
+      #   mp3/flac/vorbis/opus/alac/aac  : 其他常用音频格式（ExoPlayer 本身也有，但用 FFmpeg 统一处理也行，性能接近）
+      ENABLED_DECODERS: >-
+        ape
+        wmav1 wmav2 wmapro wmalossless
+        pcm_s16be pcm_s16le pcm_u8 pcm_alaw pcm_mulaw pcm_f32be pcm_f32le
+        mp3 mp3float flac vorbis opus alac aac aac_ltp ac3 eac3
+    steps:
+
+      # ===================== 1. 环境准备 =====================
+      - name: "[准备] 系统信息 + 剩余磁盘"
+        run: |
+          echo "OS: $(uname -a)"
+          echo "CPU cores: $(nproc)"
+          echo "Memory:"
+          free -h
+          echo "Disk free:"
+          df -h /
+
+      - name: "[准备] 安装基础构建工具 (build-essential, nasm, pkg-config)"
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends \
+            build-essential ca-certificates git wget unzip \
+            nasm pkg-config python3 python3-distutils
+          echo "python3: $(python3 --version)"
+          echo "make: $(make --version | head -n1)"
+          echo "nasm: $(nasm --version)"
+
+      - name: "[准备] 安装 JDK 17 (Eclipse Temurin, 和本地项目 JDK 一致)"
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      # ===================== 2. 下载 Android NDK r25c =====================
+      - name: "[NDK] 下载 Android NDK r25c (Linux)"
+        run: |
+          cd /tmp
+          wget -q --show-progress \
+            "https://dl.google.com/android/repository/android-ndk-r25c-linux.zip" \
+            -O ndk.zip
+          echo "NDK zip size: $(du -h ndk.zip | cut -f1)"
+      - name: "[NDK] 解压 NDK 并设置环境变量"
+        run: |
+          cd /tmp
+          unzip -q ndk.zip -d /opt
+          ls -la /opt/android-ndk-r25c/
+          # 输出 GITHUB_ENV，后续步骤可以读 $ANDROID_NDK_ROOT
+          echo "ANDROID_NDK_ROOT=/opt/android-ndk-r25c" >> "$GITHUB_ENV"
+
+      # ===================== 3. 克隆 Media3 源码 (精确到 1.5.1 tag) =====================
+      - name: "[Media3] 克隆 Media3 源码 (depth=1 加速，只拉 1.5.1 标签)"
+        run: |
+          cd /tmp
+          git clone --depth 1 --branch "${{ env.MEDIA3_TAG }}" \
+            https://github.com/androidx/media.git \
+            media3
+          cd media3
+          echo "MEDIA3_CHECKOUT=$(pwd)" >> "$GITHUB_ENV"
+          echo "HEAD commit: $(git log -1 --oneline)"
+          ls libraries/decoder_ffmpeg/src/main/jni/
+
+      # ===================== 4. 下载 FFmpeg 源码 (6.0) 并链接到 Media3 jni 目录 =====================
+      # Media3 官方推荐 FFmpeg 6.0 与 1.5.x 搭配使用
+      - name: "[FFmpeg] 下载 FFmpeg 6.0 源码"
+        run: |
+          cd /tmp
+          wget -q --show-progress \
+            "https://ffmpeg.org/releases/ffmpeg-6.0.tar.xz" \
+            -O ffmpeg-6.0.tar.xz
+          echo "FFmpeg tar size: $(du -h ffmpeg-6.0.tar.xz | cut -f1)"
+          tar xf ffmpeg-6.0.tar.xz
+          ls ffmpeg-6.0/configure
+      - name: "[FFmpeg] 链接 FFmpeg 源码到 Media3 decoder_ffmpeg/jni/ffmpeg"
+        run: |
+          FFMPEG_JNI_DIR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main/jni"
+          ln -sf /tmp/ffmpeg-6.0 "${FFMPEG_JNI_DIR}/ffmpeg"
+          ls -la "${FFMPEG_JNI_DIR}/ffmpeg/configure"
+
+      # ===================== 5. 执行 build_ffmpeg.sh 编译 FFmpeg 静态库 (.a) =====================
+      # 这是最耗时的步骤：configure + make 要跑 4 套 ABI (armv7/arm64/x86/x86_64)
+      - name: "[FFmpeg 编译] 构建全部 4 套 ABI 的 FFmpeg 静态库"
+        timeout-minutes: 140
+        run: |
+          FFMPEG_MODULE_PATH="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main"
+          BUILD_SH="${FFMPEG_MODULE_PATH}/jni/build_ffmpeg.sh"
+          echo "Using build script: ${BUILD_SH}"
+          cd "${FFMPEG_MODULE_PATH}/jni"
+          # 参数顺序严格对应脚本内的 $1 $2 $3 $4 $5...
+          bash "${BUILD_SH}" \
+            "${FFMPEG_MODULE_PATH}" \
+            "${{ env.ANDROID_NDK_ROOT }}" \
+            "linux-x86_64" \
+            "${{ env.ANDROID_ABI_LEVEL }}" \
+            ${{ env.ENABLED_DECODERS }}
+          # 验证产物：每个 ABI 目录下都要有 libavcodec.a 等静态库
+          echo "==== 编译产物 ===="
+          ls -la ffmpeg/android-libs/
+          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+            echo "--- $abi ---"
+            ls -la ffmpeg/android-libs/$abi/ 2>&1 | head -n 8
+          done
+
+      # ===================== 6. 用 Gradle 编译 Media3 decoder_ffmpeg 模块 => AAR =====================
+      - name: "[Gradle] 编译 decoder_ffmpeg-release.aar"
+        timeout-minutes: 40
+        run: |
+          cd "${{ env.MEDIA3_CHECKOUT }}"
+          chmod +x gradlew
+          echo "Gradle wrapper OK"
+          export JAVA_HOME="${JAVA_HOME_17_X64}"
+          ./gradlew \
+            :libraries:decoder_ffmpeg:assembleRelease \
+            --no-daemon \
+            --stacktrace \
+            -PdisablePreDex
+          echo "==== AAR 产物信息 ===="
+          AAR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/build/outputs/aar/decoder_ffmpeg-release.aar"
+          ls -lh "${AAR}"
+          echo "AAR 内部结构预览:"
+          unzip -l "${AAR}" | head -n 30
+
+      # ===================== 7. 上传 AAR 到 Actions Artifacts (可以下载 90 天) =====================
+      - name: "[上传] 上传 AAR 到 Artifacts (点击 Actions 页下载)"
+        uses: actions/upload-artifact@v4
+        with:
+          name: "decoder_ffmpeg-release-media3-1.5.1"
+          path: |
+            /tmp/media3/libraries/decoder_ffmpeg/build/outputs/aar/decoder_ffmpeg-release.aar
+          retention-days: 90
+          if-no-files-found: error
+
+      # ===================== 8. 同时发布到 Release (永久保存) =====================
+      - name: "[发布] 上传 AAR 到 GitHub Release"
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: "media3-1.5.1-ffmpeg"
+          name: "Media3 1.5.1 FFmpeg Extension (WMA+APE+AIFF)"
+          body: |
+            本 Release 由 GitHub Actions 自动构建。
+
+            编译配置：
+            - Media3 版本：1.5.1
+            - Android NDK  ：r25c
+            - ANDROID_ABI：24 (minSdk 24 以上可用)
+            - 包含 ABI：armeabi-v7a, arm64-v8a, x86, x86_64
+            - FFmpeg 版本：6.0
+            - 解码器：
+              - WMA: wmav1, wmav2, wmapro, wmalossless
+              - APE (Monkey's Audio): ape
+              - AIFF/AIF: pcm_s16be, pcm_s16le 等 PCM 解码器
+              - 以及: mp3, flac, vorbis, opus, alac, aac, ac3, eac3
+
+            使用方法：
+            1. 下载下面的 decoder_ffmpeg-release.aar
+            2. 复制到 Android 项目的 app/libs/ 目录
+            3. build.gradle.kts 添加：
+               ```kotlin
+               dependencies {
+                   implementation(files("libs/decoder_ffmpeg-release.aar"))
+               }
+               ```
+          files: |
+            /tmp/media3/libraries/decoder_ffmpeg/build/outputs/aar/decoder_ffmpeg-release.aar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
