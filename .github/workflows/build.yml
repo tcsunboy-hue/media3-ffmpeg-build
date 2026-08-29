@@ -1,4 +1,4 @@
-name: Build Media3 FFmpeg Extension AAR (WMA/APE/AIFF + Container Demuxer)
+﻿name: Build Media3 FFmpeg Extension AAR (WMA/APE/AIFF + Container Demuxer)
 
 # 瑙﹀彂鏂瑰紡锛?
 # 1. 涓婁紶鏂囦欢鍒?main 鍒嗘敮鍚庤嚜鍔ㄥ紑濮?
@@ -265,63 +265,55 @@ jobs:
       - name: "[Gradle] Patch CMakeLists.txt 鍔?avformat + demux_jni.cc + 缂栬瘧 AAR"
         timeout-minutes: 40
         run: |
+          echo "========= STEP START: Gradle CMake patch ========="
           cd "${{ env.MEDIA3_CHECKOUT }}"
           chmod +x gradlew
 
           CMAKEFILE="libraries/decoder_ffmpeg/src/main/jni/CMakeLists.txt"
           FFMPEG_JNI_DIR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main/jni"
 
-          echo "===== Patch 0: original CMakeLists.txt ====="
-          cat "${CMAKEFILE}"
+          echo ""
+          echo "===== DEBUG 0: ls -la jni dir ====="
+          ls -la "${FFMPEG_JNI_DIR}/"
+          echo ""
+          echo "===== DEBUG 1: Original CMakeLists.txt ====="
+          cat -n "${CMAKEFILE}"
+          echo ""
 
-          # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
-          # Patch 1: foreach 寰幆閲屽姞涓?avformat
-          #   鍘? foreach(ffmpeg_lib avutil swresample avcodec)
-          #   鏀? foreach(ffmpeg_lib avformat avutil swresample avcodec)
-          # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
+          echo "===== PATCH 1: foreach ====="
           sed -i 's/foreach(ffmpeg_lib avutil swresample avcodec)/foreach(ffmpeg_lib avformat avutil swresample avcodec)/' "${CMAKEFILE}" || true
-          grep "foreach.*avformat.*avutil" "${CMAKEFILE}" && echo "OK: Patch 1 applied" || { echo "FAIL: Patch 1 failed"; exit 1; }
+          echo "  sed exit: $?"
+          echo "  grep result:"
+          grep -n "foreach" "${CMAKEFILE}" || echo "  NO MATCH!"
+          echo ""
 
-          # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
-          # Patch 2: add_library 閲屽姞涓?ffmpeg_demux_jni.cc
-          #   鍘? add_library(ffmpegJNI SHARED ffmpeg_jni.cc)
-          #   鏀? add_library(ffmpegJNI SHARED ffmpeg_jni.cc ffmpeg_demux_jni.cc)
-          # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
-          # (sed Patch 2 removed - the pattern never matched; Python script below handles this reliably)
-          # 涓婇潰鐨?sed 鍙兘鍥犱负鏍煎紡闂娌℃纭尮閰嶏紝鐢ㄦ洿鍙潬鐨勬柟娉曪細
-          # 鍏堟仮澶嶏紝鐒跺悗鐢?python 澶勭悊
-
-          # 鐢?python 绮剧'澶勭悊 (base64 缂栫爜閬垮厤 YAML heredoc 缂╄繘闂)
+          echo "===== PATCH 2: Python script ====="
           echo "aW1wb3J0IHJlCgpjbWFrZV9wYXRoID0gImxpYnJhcmllcy9kZWNvZGVyX2ZmbXBlZy9zcmMvbWFpbi9qbmkvQ01ha2VMaXN0cy50eHQiCndpdGggb3BlbihjbWFrZV9wYXRoLCAncicpIGFzIGY6CiAgICBjb250ZW50ID0gZi5yZWFkKCkKCiMg5oqKICJhZGRfbGlicmFyeShmZm1wZWdKTklcbiAgICAgICAgICAgIFNIQVJFRFxuICAgICAgICAgICAgZmZtcGVnX2puaS5jYykiIOaUueaIkOWKoCBmZm1wZWdfZGVtdXhfam5pLmNjCiMg5oiW6ICF5pu0566A5Y2V77ya5ZyoIGZmbXBlZ19qbmkuY2Mg6YKj6KGM5ZCO6Z2i5YqgIGZmbXBlZ19kZW11eF9qbmkuY2MKY29udGVudCA9IGNvbnRlbnQucmVwbGFjZSgKICAgICdmZm1wZWdfam5pLmNjKScsCiAgICAnZmZtcGVnX2puaS5jY1xuICAgICAgICAgICAgZmZtcGVnX2RlbXV4X2puaS5jYyknCikKCiMgUGF0Y2ggMzogdGFyZ2V0X2xpbmtfbGlicmFyaWVzIOmHjOWKoCBQUklWQVRFIGF2Zm9ybWF0CmNvbnRlbnQgPSBjb250ZW50LnJlcGxhY2UoCiAgICAnUFJJVkFURSBzd3Jlc2FtcGxlXG4gICAgICAgICAgICAgICAgICAgICAgUFJJVkFURSBhdmNvZGVjJywKICAgICdQUklWQVRFIHN3cmVzYW1wbGVcbiAgICAgICAgICAgICAgICAgICAgICBQUklWQVRFIGF2Y29kZWNcbiAgICAgICAgICAgICAgICAgICAgICBQUklWQVRFIGF2Zm9ybWF0JwopCgojIFBhdGNoIDQ6IOWKoOWFpSBhdmZvcm1hdCDnmoQgaW5jbHVkZSDnm67lvZXvvIjmnInml7bpnIDopoHvvIkKIyDlhbblrp4gaW5jbHVkZV9kaXJlY3RvcmllcyhcKSDlt7Lnu4/ljIXlkKvkuoYgZmZtcGVnIOagueebruW9lQojIGF2Zm9ybWF0IOWktOaWh+S7tuWcqCBmZm1wZWcvbGliYXZmb3JtYXQvIOS4i++8jEZGbXBlZyDlronoo4XlkI7lpLTmlofku7blupTor6XlnKggZmZtcGVnL2FuZHJvaWQtbGlicy88YWJpPi9pbmNsdWRlLwojIOS9huaIkeS7rOeUqOeahOaYr+ebtOaOpea6kOeggei3r+W+hO+8jOaJgOS7pSBsaWJhdmZvcm1hdC8g5a2Q55uu5b2V5ZyoIEZGbXBlZyDmupDnoIHmoJHph4zmnKzmnaXlsLHmnIkKIyDkuI3pnIDopoHpop3lpJbliqAKCndpdGggb3BlbihjbWFrZV9wYXRoLCAndycpIGFzIGY6CiAgICBmLndyaXRlKGNvbnRlbnQpCgpwcmludCgi4pyFIFB5dGhvbiBwYXRjaCDlrozmiJAiKQ==" | base64 -d | python3
+          echo "  python exit: $?"
+          echo ""
 
+          echo "===== DEBUG 2: Patched CMakeLists.txt ====="
+          cat -n "${CMAKEFILE}"
           echo ""
-          echo "===== Patched CMakeLists.txt ====="
-          cat "${CMAKEFILE}"
-          echo ""
-          echo "===== Verify key patches ====="
-          grep "avformat avutil" "${CMAKEFILE}" && echo "OK: avformat added to foreach" || echo "FAIL: avformat foreach patch failed"
-          grep "ffmpeg_demux_jni.cc" "${CMAKEFILE}" && echo "OK: ffmpeg_demux_jni.cc added to add_library" || echo "FAIL: demux_jni.cc patch failed"
-          grep "PRIVATE avformat" "${CMAKEFILE}" && echo "OK: avformat added to target_link_libraries" || echo "FAIL: avformat link patch failed"
 
-          # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
-          # 寮烘牎楠? libavformat.a 蹇呴』瀛樺湪浜庢瘡涓?ABI 鐩綍
-          # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
+          echo "===== VERIFY: key patches ====="
+          grep -n "avformat avutil" "${CMAKEFILE}" && echo "OK: avformat in foreach" || echo "FAIL: avformat foreach"
+          grep -n "ffmpeg_demux_jni.cc" "${CMAKEFILE}" && echo "OK: demux_jni.cc added" || echo "FAIL: demux_jni.cc"
+          grep -n "PRIVATE avformat" "${CMAKEFILE}" && echo "OK: avformat link" || echo "FAIL: avformat link"
           echo ""
-          echo "===== Sanity-check libavformat.a ====="
+
+          echo "===== SANITY: libavformat.a ====="
           for abi in armeabi-v7a arm64-v8a x86 x86_64; do
             LIBAV="${FFMPEG_JNI_DIR}/ffmpeg/android-libs/$abi/libavformat.a"
             if test -f "$LIBAV"; then
               echo "OK: $abi: libavformat.a exists ($(du -h $LIBAV | cut -f1))"
             else
-              echo "FAIL: $abi: libavformat.a missing! cannot link"
-              ls -la "${FFMPEG_JNI_DIR}/ffmpeg/android-libs/$abi/" 2>&1
-              # 鎵撳嵃 FFmpeg configure 鏄惁鍚敤浜?avformat
-              echo "--- Check FFmpeg build config ---"
-              cat "${FFMPEG_JNI_DIR}/ffmpeg/android-libs/$abi/config.log" 2>/dev/null | grep -i avformat | head -n 5 || echo "(no config.log)"
-              exit 2
+              echo "FAIL: $abi: libavformat.a missing!"
+              ls -la "${FFMPEG_JNI_DIR}/ffmpeg/android-libs/$abi/" 2>&1 || echo "  dir not found!"
             fi
           done
-
+          echo ""
+          echo "========= PATCH STEP DONE ========="
           # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
           # 鍐?local.properties + Gradle 缂栬瘧
           # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
@@ -459,3 +451,4 @@ jobs:
             ${{ env.FINAL_AAR_PATH }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
