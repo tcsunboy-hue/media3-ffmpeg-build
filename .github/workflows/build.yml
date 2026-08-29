@@ -1,17 +1,17 @@
-name: Build Media3 FFmpeg Extension AAR (WMA/APE/AIFF + Container Demuxer)
+﻿name: Build Media3 FFmpeg Extension AAR (WMA/APE/AIFF + Container Demuxer)
 
-# 触发方式：
-# 1. 上传文件到 main 分支后自动开始
-# 2. 也可以在 Actions 页面手动点击 Run workflow
+# 瑙﹀彂鏂瑰紡锛?
+# 1. 涓婁紶鏂囦欢鍒?main 鍒嗘敮鍚庤嚜鍔ㄥ紑濮?
+# 2. 涔熷彲浠ュ湪 Actions 椤甸潰鎵嬪姩鐐瑰嚮 Run workflow
 #
-# ⭐️ 本次构建相比 v10 新增：
-#   - 移除 build_ffmpeg.sh 里硬编码的 --disable-avformat
-#   - 启用 FFmpeg avformat demuxer (asf/aiff/ape 等容器解析)
-#   - 新增 ffmpeg_demux_jni.cc 提供 10 个 demux JNI 函数
-#   - CMakeLists.txt 链接 avformat 静态库 + 编译 demux_jni.cc
+# 猸愶笍 鏈鏋勫缓鐩告瘮 v10 鏂板锛?
+#   - 绉婚櫎 build_ffmpeg.sh 閲岀‖缂栫爜鐨?--disable-avformat
+#   - 鍚敤 FFmpeg avformat demuxer (asf/aiff/ape 绛夊鍣ㄨВ鏋?
+#   - 鏂板 ffmpeg_demux_jni.cc 鎻愪緵 10 涓?demux JNI 鍑芥暟
+#   - CMakeLists.txt 閾炬帴 avformat 闈欐€佸簱 + 缂栬瘧 demux_jni.cc
 #
-# GitHub Actions 免费 Linux 机器：2~4 核 CPU，7GB 内存，14GB 磁盘
-# 全部编译流程约 30~60 分钟（主要耗时在 FFmpeg configure + make）
+# GitHub Actions 鍏嶈垂 Linux 鏈哄櫒锛?~4 鏍?CPU锛?GB 鍐呭瓨锛?4GB 纾佺洏
+# 鍏ㄩ儴缂栬瘧娴佺▼绾?30~60 鍒嗛挓锛堜富瑕佽€楁椂鍦?FFmpeg configure + make锛?
 on:
   push:
     branches: [ "main" ]
@@ -30,45 +30,45 @@ jobs:
       ANDROID_NDK_VERSION: "r25b"
       ANDROID_NDK_ACTUAL_VERSION: "25.1.8937393"
       ANDROID_ABI_LEVEL: "21"
-      # 启用的 FFmpeg 音频解码器
+      # 鍚敤鐨?FFmpeg 闊抽瑙ｇ爜鍣?
       ENABLED_DECODERS: >-
         ape
         wmav1 wmav2 wmapro wmalossless
         pcm_s16be pcm_s16le pcm_u8 pcm_alaw pcm_mulaw pcm_f32be pcm_f32le
         mp3 mp3float flac vorbis opus alac aac aac_ltp ac3 eac3
-      # ⭐️ 新增: 启用的 FFmpeg demuxer (容器解复用器)
-      #   asf = WMA 容器
-      #   aiff = AIFF/AIF 容器
-      #   ape = Monkey's Audio APE 容器
-      #   其他 = 顺便加上，不占多少体积
+      # 猸愶笍 鏂板: 鍚敤鐨?FFmpeg demuxer (瀹瑰櫒瑙ｅ鐢ㄥ櫒)
+      #   asf = WMA 瀹瑰櫒
+      #   aiff = AIFF/AIF 瀹瑰櫒
+      #   ape = Monkey's Audio APE 瀹瑰櫒
+      #   鍏朵粬 = 椤轰究鍔犱笂锛屼笉鍗犲灏戜綋绉?
       ENABLED_DEMUXERS: >-
         asf aiff ape wav mp3 flac ogg matroska mov mp4 avi
-      # ⭐️ 新增: 启用的 parser (比特流解析器)
+      # 猸愶笍 鏂板: 鍚敤鐨?parser (姣旂壒娴佽В鏋愬櫒)
       ENABLED_PARSERS: >-
         wmav1 wmav2 ape aac mp3 flac opus vorbis alac ac3 eac3
-      # ⭐️ 新增: 启用的 protocol (IO 协议)
+      # 猸愶笍 鏂板: 鍚敤鐨?protocol (IO 鍗忚)
       ENABLED_PROTOCOLS: >-
         file pipe
-      # ⭐️ 新增: 启用的 bitstream filter
+      # 猸愶笍 鏂板: 鍚敤鐨?bitstream filter
       ENABLED_BSF: >-
         aac_adtstoasc
 
     steps:
 
-      # ===================== 0. 磁盘瘦身 =====================
-      - name: "[磁盘] 瘦身：删除无用预装软件，腾出可用空间"
+      # ===================== 0. 纾佺洏鐦﹁韩 =====================
+      - name: "[纾佺洏] 鐦﹁韩锛氬垹闄ゆ棤鐢ㄩ瑁呰蒋浠讹紝鑵惧嚭鍙敤绌洪棿"
         run: |
-          echo "--- 瘦身前磁盘 ---"
+          echo "--- 鐦﹁韩鍓嶇鐩?---"
           df -h /
           sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d/dotnet* 2>/dev/null || true
           sudo rm -rf /opt/ghc /usr/local/share/boost /opt/mssql-tools /opt/hostedtoolcache/go /opt/hostedtoolcache/node /opt/hostedtoolcache/Python /opt/hostedtoolcache/Ruby /opt/hostedtoolcache/CodeQL 2>/dev/null || true
           sudo apt-get clean -y && sudo apt-get autoremove -y 2>/dev/null || true
           sudo rm -rf /tmp/* /tmp/.??* 2>/dev/null || true
-          echo "--- 瘦身后磁盘 ---"
+          echo "--- 鐦﹁韩鍚庣鐩?---"
           df -h /
 
-      # ===================== 1. 环境准备 =====================
-      - name: "[准备] 系统信息 + 安装基础构建工具"
+      # ===================== 1. 鐜鍑嗗 =====================
+      - name: "[鍑嗗] 绯荤粺淇℃伅 + 瀹夎鍩虹鏋勫缓宸ュ叿"
         run: |
           echo "OS: $(uname -a)"
           echo "CPU cores: $(nproc)"
@@ -80,14 +80,14 @@ jobs:
             nasm pkg-config python3 python3-distutils
           echo "make: $(make --version | head -n1)"
 
-      - name: "[准备] 安装 JDK 17"
+      - name: "[鍑嗗] 瀹夎 JDK 17"
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
           java-version: "17"
 
-      # ===================== 2. 下载 Android NDK r25b =====================
-      - name: "[NDK] 下载并解压 NDK r25b"
+      # ===================== 2. 涓嬭浇 Android NDK r25b =====================
+      - name: "[NDK] 涓嬭浇骞惰В鍘?NDK r25b"
         run: |
           cd /tmp
           wget -q --show-progress \
@@ -95,12 +95,12 @@ jobs:
             -O ndk.zip
           unzip -q ndk.zip -d /opt
           NDK_DIR="/opt/android-ndk-${{ env.ANDROID_NDK_VERSION }}"
-          echo "NDK 解压到: $NDK_DIR"
+          echo "NDK 瑙ｅ帇鍒? $NDK_DIR"
           ls -la "$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/" | head -n 10
           echo "ANDROID_NDK_ROOT=$NDK_DIR" >> "$GITHUB_ENV"
 
-      # ===================== 2b. 安装 Android SDK =====================
-      - name: "[Android SDK] 安装 cmdline-tools + Platform 35 + Build-Tools 34.0.0 + CMake 3.22.1"
+      # ===================== 2b. 瀹夎 Android SDK =====================
+      - name: "[Android SDK] 瀹夎 cmdline-tools + Platform 35 + Build-Tools 34.0.0 + CMake 3.22.1"
         timeout-minutes: 15
         run: |
           set -eu
@@ -123,8 +123,8 @@ jobs:
           echo "ANDROID_SDK_ROOT=${SDK_ROOT}" >> "$GITHUB_ENV"
           echo "${SDK_ROOT}/cmake/3.22.1/bin" >> "$GITHUB_PATH"
 
-      # ===================== 3. 克隆 Media3 源码 =====================
-      - name: "[Media3] 克隆 Media3 1.5.1 源码"
+      # ===================== 3. 鍏嬮殕 Media3 婧愮爜 =====================
+      - name: "[Media3] 鍏嬮殕 Media3 1.5.1 婧愮爜"
         run: |
           cd /tmp
           git clone --depth 1 --branch "${{ env.MEDIA3_TAG }}" \
@@ -134,97 +134,97 @@ jobs:
           echo "HEAD: $(git log -1 --oneline)"
           ls -la libraries/decoder_ffmpeg/src/main/jni/
 
-      # ===================== 4. 下载 FFmpeg 6.0 源码并链接 =====================
-      - name: "[FFmpeg] 下载 FFmpeg 6.0 源码"
+      # ===================== 4. 涓嬭浇 FFmpeg 6.0 婧愮爜骞堕摼鎺?=====================
+      - name: "[FFmpeg] 涓嬭浇 FFmpeg 6.0 婧愮爜"
         run: |
           cd /tmp
           wget -q --show-progress "https://ffmpeg.org/releases/ffmpeg-6.0.tar.xz" -O ffmpeg-6.0.tar.xz
           echo "FFmpeg tar size: $(du -h ffmpeg-6.0.tar.xz | cut -f1)"
           tar xf ffmpeg-6.0.tar.xz
-          test -f ffmpeg-6.0/configure && echo "✅ ffmpeg-6.0/configure 存在" || echo "❌ 解压失败"
+          test -f ffmpeg-6.0/configure && echo "鉁?ffmpeg-6.0/configure 瀛樺湪" || echo "鉂?瑙ｅ帇澶辫触"
 
-      - name: "[FFmpeg] 链接 FFmpeg 源码到 jni/ffmpeg 目录"
+      - name: "[FFmpeg] 閾炬帴 FFmpeg 婧愮爜鍒?jni/ffmpeg 鐩綍"
         run: |
           FFMPEG_JNI_DIR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main/jni"
           rm -rf "${FFMPEG_JNI_DIR}/ffmpeg" 2>/dev/null || true
-          # 先尝试 symlink，失败再实体拷贝
+          # 鍏堝皾璇?symlink锛屽け璐ュ啀瀹炰綋鎷疯礉
           if ln -sf /tmp/ffmpeg-6.0 "${FFMPEG_JNI_DIR}/ffmpeg" && test -f "${FFMPEG_JNI_DIR}/ffmpeg/configure"; then
-            echo "INFO: symlink 成功"
+            echo "INFO: symlink 鎴愬姛"
           else
-            echo "WARN: symlink 失败，改用实体拷贝"
+            echo "WARN: symlink 澶辫触锛屾敼鐢ㄥ疄浣撴嫹璐?
             rm -rf "${FFMPEG_JNI_DIR}/ffmpeg"
             cp -r /tmp/ffmpeg-6.0 "${FFMPEG_JNI_DIR}/ffmpeg"
           fi
-          test -d "${FFMPEG_JNI_DIR}/ffmpeg" && echo "✅ jni/ffmpeg 目录存在" || echo "❌ jni/ffmpeg 目录不存在"
+          test -d "${FFMPEG_JNI_DIR}/ffmpeg" && echo "鉁?jni/ffmpeg 鐩綍瀛樺湪" || echo "鉂?jni/ffmpeg 鐩綍涓嶅瓨鍦?
           ls -la "${FFMPEG_JNI_DIR}/ffmpeg/configure"
 
-      # ===================== 5. ⭐️ 关键：Patch build_ffmpeg.sh 启用 avformat =====================
-      # Media3 官方 build_ffmpeg.sh 硬编码了 --disable-avformat
-      # 我们需要:
-      #   1) 删掉 --disable-avformat
-      #   2) 加上 demuxer/parser/protocol/bsf 的 --enable 选项
-      # 这样 make 才会生成 libavformat.a
-      - name: "[Patch FFmpeg] 修改 build_ffmpeg.sh 启用 avformat + demuxer"
+      # ===================== 5. 猸愶笍 鍏抽敭锛歅atch build_ffmpeg.sh 鍚敤 avformat =====================
+      # Media3 瀹樻柟 build_ffmpeg.sh 纭紪鐮佷簡 --disable-avformat
+      # 鎴戜滑闇€瑕?
+      #   1) 鍒犳帀 --disable-avformat
+      #   2) 鍔犱笂 demuxer/parser/protocol/bsf 鐨?--enable 閫夐」
+      # 杩欐牱 make 鎵嶄細鐢熸垚 libavformat.a
+      - name: "[Patch FFmpeg] 淇敼 build_ffmpeg.sh 鍚敤 avformat + demuxer"
         run: |
           FFMPEG_JNI_DIR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main/jni"
           PATCHED_SH="${FFMPEG_JNI_DIR}/build_ffmpeg.sh"
-          echo "==== Patch 前的 COMMON_OPTIONS 部分 ===="
+          echo "==== Patch 鍓嶇殑 COMMON_OPTIONS 閮ㄥ垎 ===="
           grep -A 25 "COMMON_OPTIONS=" "${PATCHED_SH}" | head -n 30
 
-          # Step 1: 移除 --disable-avformat（关键！没有这行就不会编 libavformat）
+          # Step 1: 绉婚櫎 --disable-avformat锛堝叧閿紒娌℃湁杩欒灏变笉浼氱紪 libavformat锛?
           sed -i 's/--disable-avformat//g' "${PATCHED_SH}"
-          echo "---- sed 后检查 ----"
-          grep "avformat" "${PATCHED_SH}" || echo "✅ --disable-avformat 已删除"
+          echo "---- sed 鍚庢鏌?----"
+          grep "avformat" "${PATCHED_SH}" || echo "鉁?--disable-avformat 宸插垹闄?
 
-          # Step 2: 在 COMMON_OPTIONS 末尾（--disable-vulkan 后面）追加我们的 enable 选项
-          # 因为 COMMON_OPTIONS 是双引号多行字符串，我们用 sed 在 --enable-swresample 后面插入
+          # Step 2: 鍦?COMMON_OPTIONS 鏈熬锛?-disable-vulkan 鍚庨潰锛夎拷鍔犳垜浠殑 enable 閫夐」
+          # 鍥犱负 COMMON_OPTIONS 鏄弻寮曞彿澶氳瀛楃涓诧紝鎴戜滑鐢?sed 鍦?--enable-swresample 鍚庨潰鎻掑叆
           sed -i '/--enable-swresample$/a\    --enable-protocol=file \\\n    --enable-protocol=pipe \\' "${PATCHED_SH}"
 
-          # 现在验证修改
-          echo "==== Patch 后的 COMMON_OPTIONS 部分 ===="
+          # 鐜板湪楠岃瘉淇敼
+          echo "==== Patch 鍚庣殑 COMMON_OPTIONS 閮ㄥ垎 ===="
           grep -A 30 "COMMON_OPTIONS=" "${PATCHED_SH}" | head -n 40
 
-          # 验证 avformat 不再被禁用
-          grep -q "disable-avformat" "${PATCHED_SH}" && { echo "❌ ERROR: --disable-avformat 仍存在!"; exit 1; } \
-            || echo "✅ --disable-avformat 已移除"
+          # 楠岃瘉 avformat 涓嶅啀琚鐢?
+          grep -q "disable-avformat" "${PATCHED_SH}" && { echo "鉂?ERROR: --disable-avformat 浠嶅瓨鍦?"; exit 1; } \
+            || echo "鉁?--disable-avformat 宸茬Щ闄?
 
-          # 验证 enable-protocol 已添加
-          grep -q "enable-protocol=file" "${PATCHED_SH}" && echo "✅ --enable-protocol=file 已添加" \
-            || echo "⚠️ enable-protocol 可能没加成功（非致命，后面我们会在 ENABLED_FLAGS 里强制加）"
+          # 楠岃瘉 enable-protocol 宸叉坊鍔?
+          grep -q "enable-protocol=file" "${PATCHED_SH}" && echo "鉁?--enable-protocol=file 宸叉坊鍔? \
+            || echo "鈿狅笍 enable-protocol 鍙兘娌″姞鎴愬姛锛堥潪鑷村懡锛屽悗闈㈡垜浠細鍦?ENABLED_FLAGS 閲屽己鍒跺姞锛?
 
-      # ===================== 5b. ⭐️ 强制追加 demuxer/parser/bsf 到 build_ffmpeg.sh =====================
-      # 因为 build_ffmpeg.sh 的 COMMON_OPTIONS 不支持 demuxer/parser 参数
-      # 我们在每次 ./configure 调用时手动追加 --enable-demuxer=xxx 等参数
-      # 具体做法：直接修改脚本，在每个 ${COMMON_OPTIONS} 后面追加我们的 FLAGS
-      - name: "[Patch FFmpeg] 追加 demuxer/parser/bsf/protocol 到 configure 命令"
+      # ===================== 5b. 猸愶笍 寮哄埗杩藉姞 demuxer/parser/bsf 鍒?build_ffmpeg.sh =====================
+      # 鍥犱负 build_ffmpeg.sh 鐨?COMMON_OPTIONS 涓嶆敮鎸?demuxer/parser 鍙傛暟
+      # 鎴戜滑鍦ㄦ瘡娆?./configure 璋冪敤鏃舵墜鍔ㄨ拷鍔?--enable-demuxer=xxx 绛夊弬鏁?
+      # 鍏蜂綋鍋氭硶锛氱洿鎺ヤ慨鏀硅剼鏈紝鍦ㄦ瘡涓?${COMMON_OPTIONS} 鍚庨潰杩藉姞鎴戜滑鐨?FLAGS
+      - name: "[Patch FFmpeg] 杩藉姞 demuxer/parser/bsf/protocol 鍒?configure 鍛戒护"
         run: |
           FFMPEG_JNI_DIR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main/jni"
           PATCHED_SH="${FFMPEG_JNI_DIR}/build_ffmpeg.sh"
 
-          # 定义 EXTRA_FLAGS 变量（单行，避免 YAML heredoc 缩进问题）
+          # 瀹氫箟 EXTRA_FLAGS 鍙橀噺锛堝崟琛岋紝閬垮厤 YAML heredoc 缂╄繘闂锛?
           EXTRA_FLAGS="--enable-avformat --enable-demuxer=asf --enable-demuxer=aiff --enable-demuxer=ape --enable-demuxer=wav --enable-demuxer=mp3 --enable-demuxer=flac --enable-demuxer=ogg --enable-demuxer=matroska --enable-demuxer=mov --enable-demuxer=mp4 --enable-demuxer=avi --enable-parser=wmav1 --enable-parser=wmav2 --enable-parser=ape --enable-parser=aac --enable-parser=mp3 --enable-parser=flac --enable-parser=opus --enable-parser=vorbis --enable-parser=alac --enable-parser=ac3 --enable-parser=eac3 --enable-protocol=file --enable-protocol=pipe --enable-bsf=aac_adtstoasc --enable-bsf=h264_mp4toannexb"
 
-          # 把 EXTRA_FLAGS 插入到 COMMON_OPTIONS 的 --enable-swresample 那一行后面
-          # 用 sed 在 --enable-swresample 行后面追加 EXTRA_FLAGS
+          # 鎶?EXTRA_FLAGS 鎻掑叆鍒?COMMON_OPTIONS 鐨?--enable-swresample 閭ｄ竴琛屽悗闈?
+          # 鐢?sed 鍦?--enable-swresample 琛屽悗闈㈣拷鍔?EXTRA_FLAGS
           sed -i "/--enable-swresample/a\\    ${EXTRA_FLAGS}" "${PATCHED_SH}"
 
-          echo "==== Patch 后的 COMMON_OPTIONS 部分 ===="
+          echo "==== Patch 鍚庣殑 COMMON_OPTIONS 閮ㄥ垎 ===="
           grep -A 2 "enable-swresample" "${PATCHED_SH}" | head -n 5
 
           echo ""
-          echo "==== 验证关键 patch ===="
-          grep "disable-avformat" "${PATCHED_SH}" && echo "  ❌ --disable-avformat 仍存在!" || echo "  ✅ --disable-avformat 已移除"
-          grep "enable-avformat" "${PATCHED_SH}" && echo "  ✅ --enable-avformat 已添加" || echo "  ❌ 未找到"
-          grep "enable-demuxer=asf" "${PATCHED_SH}" && echo "  ✅ --enable-demuxer=asf 已添加" || echo "  ❌ 未找到"
+          echo "==== 楠岃瘉鍏抽敭 patch ===="
+          grep "disable-avformat" "${PATCHED_SH}" && echo "  鉂?--disable-avformat 浠嶅瓨鍦?" || echo "  鉁?--disable-avformat 宸茬Щ闄?
+          grep "enable-avformat" "${PATCHED_SH}" && echo "  鉁?--enable-avformat 宸叉坊鍔? || echo "  鉂?鏈壘鍒?
+          grep "enable-demuxer=asf" "${PATCHED_SH}" && echo "  鉁?--enable-demuxer=asf 宸叉坊鍔? || echo "  鉂?鏈壘鍒?
 
-      # ===================== 5c. ⭐️ 运行修改后的 build_ffmpeg.sh 编译 FFmpeg =====================
-      - name: "[FFmpeg 编译] 构建全部 4 套 ABI 的 FFmpeg 静态库 (含 libavformat.a)"
+      # ===================== 5c. 猸愶笍 杩愯淇敼鍚庣殑 build_ffmpeg.sh 缂栬瘧 FFmpeg =====================
+      - name: "[FFmpeg 缂栬瘧] 鏋勫缓鍏ㄩ儴 4 濂?ABI 鐨?FFmpeg 闈欐€佸簱 (鍚?libavformat.a)"
         timeout-minutes: 140
         run: |
           FFMPEG_MODULE_PATH="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main"
           BUILD_SH="${FFMPEG_MODULE_PATH}/jni/build_ffmpeg.sh"
           cd "${FFMPEG_MODULE_PATH}/jni"
-          echo "===== 运行修改后的 build_ffmpeg.sh ====="
+          echo "===== 杩愯淇敼鍚庣殑 build_ffmpeg.sh ====="
           bash "${BUILD_SH}" \
             "${FFMPEG_MODULE_PATH}" \
             "${{ env.ANDROID_NDK_ROOT }}" \
@@ -233,32 +233,33 @@ jobs:
             ${{ env.ENABLED_DECODERS }}
 
           echo ""
-          echo "===== 验证编译产物 (每个 ABI 必须有 libavformat.a!) ====="
+          echo "===== 楠岃瘉缂栬瘧浜х墿 (姣忎釜 ABI 蹇呴』鏈?libavformat.a!) ====="
           for abi in armeabi-v7a arm64-v8a x86 x86_64; do
             echo "--- $abi ---"
             for lib in libavcodec.a libavformat.a libavutil.a libswresample.a; do
               f="ffmpeg/android-libs/$abi/$lib"
               if [ -f "$f" ]; then
-                echo "  ✅ $lib ($(du -h $f | cut -f1))"
+                echo "  鉁?$lib ($(du -h $f | cut -f1))"
               else
-                echo "  ❌ $lib 缺失!"
+                echo "  鉂?$lib 缂哄け!"
               fi
             done
             ls -la "ffmpeg/android-libs/$abi/" | head -n 10
           done
 
-      # ===================== 5d. ⭐️ 写 ffmpeg_demux_jni.cc (10 个 demux JNI 函数) =====================
-      # 这是我们新增的 JNI 文件，提供 avformat demux 功能给 Kotlin 的 FfmpegExtractor 调用
-      - name: "[Write] 生成 ffmpeg_demux_jni.cc (avformat demux JNI)"
+      # ===================== 5d. 猸愶笍 鍐?ffmpeg_demux_jni.cc (10 涓?demux JNI 鍑芥暟) =====================
+      # 杩欐槸鎴戜滑鏂板鐨?JNI 鏂囦欢锛屾彁渚?avformat demux 鍔熻兘缁?Kotlin 鐨?FfmpegExtractor 璋冪敤
+      - name: "[Write] 鐢熸垚 ffmpeg_demux_jni.cc (avformat demux JNI)"
         run: |
           DEMUX_JNI="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main/jni/ffmpeg_demux_jni.cc"
-          echo "LyoKICogRmZtcGVnRXh0cmFjdG9yIGRlbXV4IEpOSSBicmlkZ2UKICoKICog5Li6IEtvdGxpbiDnsbsgY29tLndtcGxheS5leHRyYWN0b3IuRmZtcGVnRXh0cmFjdG9yIOaPkOS+myBuYXRpdmUg5Ye95pWw44CCCiAqIOWfuuS6jiBGRm1wZWcgYXZmb3JtYXQgQVBJIOWunueOsOWuueWZqOino+WkjeeUqCAoY29udGFpbmVyIGRlbXV4aW5nKeOAggogKgogKiDlh73mlbDlkb3lkI3moLzlvI86IEphdmFfY29tX3dtcGxheV9leHRyYWN0b3JfRmZtcGVnRXh0cmFjdG9yXzxuYW1lPgogKiAoSk5JIOinhOiMgzog5YyF5ZCN6L2s5LiL5YiS57q/ICsg57G75ZCNICsg5pa55rOV5ZCNKQogKi8KI2luY2x1ZGUgPGFuZHJvaWQvbG9nLmg+CiNpbmNsdWRlIDxqbmkuaD4KI2luY2x1ZGUgPHN0ZGxpYi5oPgojaW5jbHVkZSA8c3RyaW5nLmg+CgpleHRlcm4gIkMiIHsKI2RlZmluZSBfX1NURENfQ09OU1RBTlRfTUFDUk9TCiNpZmRlZiBfU1RESU5UX0gKI3VuZGVmIF9TVERJTlRfSAojZW5kaWYKI2luY2x1ZGUgPHN0ZGludC5oPgojaW5jbHVkZSA8bGliYXZmb3JtYXQvYXZmb3JtYXQuaD4KI2luY2x1ZGUgPGxpYmF2Y29kZWMvYXZjb2RlYy5oPgojaW5jbHVkZSA8bGliYXZ1dGlsL2Vycm9yLmg+CiNpbmNsdWRlIDxsaWJhdnV0aWwvb3B0Lmg+Cn0KCiNkZWZpbmUgTE9HX1RBRyAiZmZtcGVnX2RlbXV4IgojZGVmaW5lIExPR0UoLi4uKSAoKHZvaWQpX19hbmRyb2lkX2xvZ19wcmludChBTkRST0lEX0xPR19FUlJPUiwgTE9HX1RBRywgX19WQV9BUkdTX18pKQojZGVmaW5lIExPR0QoLi4uKSAoKHZvaWQpX19hbmRyb2lkX2xvZ19wcmludChBTkRST0lEX0xPR19ERUJVRywgTE9HX1RBRywgX19WQV9BUkdTX18pKQojZGVmaW5lIExPR1coLi4uKSAoKHZvaWQpX19hbmRyb2lkX2xvZ19wcmludChBTkRST0lEX0xPR19XQVJOLCBMT0dfVEFHLCBfX1ZBX0FSR1NfXykpCgovLyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKLy8g5YaF6YOo54q25oCB57uT5p6E5L2T77ya5bCB6KOF5LiA5qyhIGRlbXV4IHNlc3Npb24g55qE5omA5pyJ54q25oCBCi8vIEtvdGxpbiDnq6/nlKggamxvbmcg5oyB5pyJ6L+Z5Liq5oyH6ZKICi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkApzdHJ1Y3QgRGVtdXhTZXNzaW9uIHsKICAgIEFWRm9ybWF0Q29udGV4dCAqZm10Q3R4OwogICAgaW50IGF1ZGlvU3RyZWFtSW5kZXg7CiAgICBjb25zdCBBVkNvZGVjUGFyYW1ldGVycyAqYXVkaW9Db2RlY1BhcmFtczsKICAgIEFWUGFja2V0ICpjdXJyZW50UGFja2V0OyAgICAgLy8g5b2T5YmN5q2j5Zyo6K+755qEIHBhY2tldAogICAgaW50NjRfdCBsYXN0UHRzVXM7ICAgICAgICAgICAvLyDkuIrkuIDkuKogcGFja2V0IOeahCBQVFMgKOW+ruenkikKICAgIGJvb2wgaGFzUGFja2V0OyAgICAgICAgICAgICAgLy8gY3VycmVudFBhY2tldCDmmK/lkKbmnInmlbDmja4KfTsKCi8vIOagvOW8j+WMliBGRm1wZWcg6ZSZ6K+v56CBCnN0YXRpYyB2b2lkIGxvZ19hdl9lcnJvcihjb25zdCBjaGFyICpmdW5jLCBpbnQgZXJyKSB7CiAgICBjaGFyIGJ1ZlsyNTZdOwogICAgYXZfc3RyZXJyb3IoZXJyLCBidWYsIHNpemVvZihidWYpKTsKICAgIExPR0UoIiVzOiAlcyAoY29kZT0lZCkiLCBmdW5jLCBidWYsIGVycik7Cn0KCi8vIOagueaNriBGRm1wZWcgY29kZWNfaWQg5pig5bCE5YiwIEFuZHJvaWQgTWVkaWEzIE1JTUUgdHlwZQpzdGF0aWMgY29uc3QgY2hhciogY29kZWNfdG9fbWltZShBVkNvZGVjSUQgY29kZWNJZCkgewogICAgc3dpdGNoIChjb2RlY0lkKSB7CiAgICAgICAgY2FzZSBBVl9DT0RFQ19JRF9XTUFWMTogcmV0dXJuICJhdWRpby94LW1zLXdtYSI7CiAgICAgICAgY2FzZSBBVl9DT0RFQ19JRF9XTUFWMjogcmV0dXJuICJhdWRpby94LW1zLXdtYSI7CiAgICAgICAgY2FzZSBBVl9DT0RFQ19JRF9XTUFQUk86IHJldHVybiAiYXVkaW8veC1tcy13bWEiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfV01BTE9TU0xFU1M6IHJldHVybiAiYXVkaW8veC1tcy13bWEiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfQVBFOiByZXR1cm4gImF1ZGlvL2FwZSI7CiAgICAgICAgY2FzZSBBVl9DT0RFQ19JRF9GTEFDOiByZXR1cm4gImF1ZGlvL2ZsYWMiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfTVAzOiByZXR1cm4gImF1ZGlvL21wZWciOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfQUFDOiByZXR1cm4gImF1ZGlvL21wNGEtbGF0bSI7CiAgICAgICAgY2FzZSBBVl9DT0RFQ19JRF9PUFVTOiByZXR1cm4gImF1ZGlvL29wdXMiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfVk9SQklTOiByZXR1cm4gImF1ZGlvL3ZvcmJpcyI7CiAgICAgICAgY2FzZSBBVl9DT0RFQ19JRF9BTEFDOiByZXR1cm4gImF1ZGlvL2FsYWMiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfQUMzOiByZXR1cm4gImF1ZGlvL2FjMyI7CiAgICAgICAgY2FzZSBBVl9DT0RFQ19JRF9FQUMzOiByZXR1cm4gImF1ZGlvL2VhYzMiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfUENNX1MxNkxFOiByZXR1cm4gImF1ZGlvL2wxNiI7CiAgICAgICAgY2FzZSBBVl9DT0RFQ19JRF9QQ01fUzE2QkU6IHJldHVybiAiYXVkaW8vbDE2IjsKICAgICAgICBjYXNlIEFWX0NPREVDX0lEX1BDTV9VODogcmV0dXJuICJhdWRpby9sMTYiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfUENNX0FMQVc6IHJldHVybiAiYXVkaW8vZzcxMWEiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfUENNX01VTEFXOiByZXR1cm4gImF1ZGlvL2c3MTF1IjsKICAgICAgICBjYXNlIEFWX0NPREVDX0lEX1BDTV9GMzJMRTogcmV0dXJuICJhdWRpby9sMTYiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfUENNX0YzMkJFOiByZXR1cm4gImF1ZGlvL2wxNiI7CiAgICAgICAgZGVmYXVsdDoKICAgICAgICAgICAgTE9HRSgiVW5rbm93biBjb2RlYyBpZDogJWQiLCBjb2RlY0lkKTsKICAgICAgICAgICAgcmV0dXJuICJhdWRpby94LWZmbXBlZyI7ICAvLyBmYWxsYmFjawogICAgfQp9CgovLyDml7bpl7Tln7rovazlvq7np5IKc3RhdGljIGludDY0X3QgcHRzX3RvX3VzKGludDY0X3QgcHRzLCBBVlJhdGlvbmFsIHRpbWVCYXNlKSB7CiAgICBpZiAocHRzID09IEFWX05PUFRTX1ZBTFVFKSByZXR1cm4gQVZfTk9QVFNfVkFMVUU7CiAgICByZXR1cm4gYXZfcmVzY2FsZV9xKHB0cywgdGltZUJhc2UsIChBVlJhdGlvbmFsKXsxLCAxMDAwMDAwfSk7Cn0KCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAovLyAxLiBuYXRpdmVQcm9iZURhdGEgLSDmjqLmtYsgMTYg5a2X6IqCIGhlYWRlciDliKTmlq0gRkZtcGVnIOiDveivhuWIq+eahOagvOW8jwovLyDov5Tlm54gdHJ1ZSDooajnpLogRkZtcGVnIOiDveWkhOeQhui/meS4quaWh+S7tgovLyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKZXh0ZXJuICJDIiBKTklFWFBPUlQgamJvb2xlYW4gSk5JQ0FMTApKYXZhX2NvbV93bXBsYXlfZXh0cmFjdG9yX0ZmbXBlZ0V4dHJhY3Rvcl9uYXRpdmVQcm9iZURhdGEoCiAgICBKTklFbnYgKmVudiwgam9iamVjdCAvKnRoaXoqLywgamJ5dGVBcnJheSBoZWFkZXJCeXRlcykgewoKICAgIGlmICghaGVhZGVyQnl0ZXMpIHJldHVybiBKTklfRkFMU0U7CiAgICBqc2l6ZSBsZW4gPSBlbnYtPkdldEFycmF5TGVuZ3RoKGhlYWRlckJ5dGVzKTsKICAgIGlmIChsZW4gPCA0KSByZXR1cm4gSk5JX0ZBTFNFOwoKICAgIHVpbnQ4X3QgKmJ1ZiA9ICh1aW50OF90ICopZW52LT5HZXRCeXRlQXJyYXlFbGVtZW50cyhoZWFkZXJCeXRlcywgTlVMTCk7CiAgICBpZiAoIWJ1ZikgcmV0dXJuIEpOSV9GQUxTRTsKCiAgICBBVlByb2JlRGF0YSBwZDsKICAgIG1lbXNldCgmcGQsIDAsIHNpemVvZihwZCkpOwogICAgcGQuYnVmID0gYnVmOwogICAgcGQuYnVmX3NpemUgPSBsZW47CiAgICBwZC5maWxlbmFtZSA9ICIiOwoKICAgIGNvbnN0IEFWSW5wdXRGb3JtYXQgKmZtdCA9IGF2X3Byb2JlX2lucHV0X2Zvcm1hdCgmcGQsIDApOwoKICAgIGVudi0+UmVsZWFzZUJ5dGVBcnJheUVsZW1lbnRzKGhlYWRlckJ5dGVzLCAoamJ5dGUqKWJ1ZiwgSk5JX0FCT1JUKTsKCiAgICBpZiAoZm10KSB7CiAgICAgICAgTE9HRCgicHJvYmUgT0s6IGZvcm1hdD0lcyAobmFtZT0lcykiLCBmbXQtPmxvbmdfbmFtZSA/IGZtdC0+bG9uZ19uYW1lIDogIj8iLCBmbXQtPm5hbWUpOwogICAgICAgIHJldHVybiBKTklfVFJVRTsKICAgIH0KICAgIHJldHVybiBKTklfRkFMU0U7Cn0KCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAovLyAyLiBuYXRpdmVPcGVuSW5wdXQgLSDmiZPlvIDmnKzlnLDmlofku7bvvIzov5Tlm54gRGVtdXhTZXNzaW9uKiDkvZzkuLogamxvbmcKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCmV4dGVybiAiQyIgSk5JRVhQT1JUIGpsb25nIEpOSUNBTEwKSmF2YV9jb21fd21wbGF5X2V4dHJhY3Rvcl9GZm1wZWdFeHRyYWN0b3JfbmF0aXZlT3BlbklucHV0KAogICAgSk5JRW52ICplbnYsIGpvYmplY3QgLyp0aGl6Ki8sIGpzdHJpbmcgcGF0aFN0cikgewoKICAgIGlmICghcGF0aFN0cikgcmV0dXJuIDA7CiAgICBjb25zdCBjaGFyICpwYXRoID0gZW52LT5HZXRTdHJpbmdVVEZDaGFycyhwYXRoU3RyLCBOVUxMKTsKICAgIGlmICghcGF0aCkgcmV0dXJuIDA7CgogICAgTE9HRCgibmF0aXZlT3BlbklucHV0OiAlcyIsIHBhdGgpOwoKICAgIERlbXV4U2Vzc2lvbiAqc2Vzc2lvbiA9IG5ldyBEZW11eFNlc3Npb24oKTsKICAgIG1lbXNldChzZXNzaW9uLCAwLCBzaXplb2YoKnNlc3Npb24pKTsKCiAgICAvLyDlv4XpobvlhYjosIPnlKggYXZmb3JtYXRfbmV0d29ya19pbml077yI6Jm954S25oiR5Lus5Y+q55So5pys5Zyw5paH5Lu277yM5L2G5p+Q5Lqb5Y2P6K6u5Lya55So5Yiw77yJCiAgICAvLyDlhbblrp7mnKzlnLDmlofku7bkuI3pnIDopoHvvIzot7Pov4cKCiAgICAvLyDnlKggYXZmb3JtYXRfb3Blbl9pbnB1dCDmiZPlvIAKICAgIGludCByZXQgPSBhdmZvcm1hdF9vcGVuX2lucHV0KCZzZXNzaW9uLT5mbXRDdHgsIHBhdGgsIE5VTEwsIE5VTEwpOwogICAgaWYgKHJldCA8IDApIHsKICAgICAgICBsb2dfYXZfZXJyb3IoImF2Zm9ybWF0X29wZW5faW5wdXQiLCByZXQpOwogICAgICAgIGRlbGV0ZSBzZXNzaW9uOwogICAgICAgIGVudi0+UmVsZWFzZVN0cmluZ1VURkNoYXJzKHBhdGhTdHIsIHBhdGgpOwogICAgICAgIHJldHVybiAwOwogICAgfQoKICAgIC8vIOaJvuWIsOmfs+mikea1gQogICAgcmV0ID0gYXZmb3JtYXRfZmluZF9zdHJlYW1faW5mbyhzZXNzaW9uLT5mbXRDdHgsIE5VTEwpOwogICAgaWYgKHJldCA8IDApIHsKICAgICAgICBsb2dfYXZfZXJyb3IoImF2Zm9ybWF0X2ZpbmRfc3RyZWFtX2luZm8iLCByZXQpOwogICAgICAgIGF2Zm9ybWF0X2Nsb3NlX2lucHV0KCZzZXNzaW9uLT5mbXRDdHgpOwogICAgICAgIGRlbGV0ZSBzZXNzaW9uOwogICAgICAgIGVudi0+UmVsZWFzZVN0cmluZ1VURkNoYXJzKHBhdGhTdHIsIHBhdGgpOwogICAgICAgIHJldHVybiAwOwogICAgfQoKICAgIC8vIOmBjeWOhuaJvuesrOS4gOS4qumfs+mikea1gQogICAgc2Vzc2lvbi0+YXVkaW9TdHJlYW1JbmRleCA9IC0xOwogICAgZm9yICh1bnNpZ25lZCBpID0gMDsgaSA8IHNlc3Npb24tPmZtdEN0eC0+bmJfc3RyZWFtczsgaSsrKSB7CiAgICAgICAgQVZNZWRpYVR5cGUgdHlwZSA9IHNlc3Npb24tPmZtdEN0eC0+c3RyZWFtc1tpXS0+Y29kZWNwYXItPmNvZGVjX3R5cGU7CiAgICAgICAgaWYgKHR5cGUgPT0gQVZNRURJQV9UWVBFX0FVRElPKSB7CiAgICAgICAgICAgIHNlc3Npb24tPmF1ZGlvU3RyZWFtSW5kZXggPSAoaW50KWk7CiAgICAgICAgICAgIGJyZWFrOwogICAgICAgIH0KICAgIH0KCiAgICBpZiAoc2Vzc2lvbi0+YXVkaW9TdHJlYW1JbmRleCA+PSAwKSB7CiAgICAgICAgc2Vzc2lvbi0+YXVkaW9Db2RlY1BhcmFtcyA9IHNlc3Npb24tPmZtdEN0eC0+c3RyZWFtc1tzZXNzaW9uLT5hdWRpb1N0cmVhbUluZGV4XS0+Y29kZWNwYXI7CiAgICAgICAgTE9HRCgiYXVkaW8gc3RyZWFtPSVkLCBjb2RlY19pZD0lZCwgY29kZWNfbmFtZT0lcyIsCiAgICAgICAgICAgICBzZXNzaW9uLT5hdWRpb1N0cmVhbUluZGV4LAogICAgICAgICAgICAgc2Vzc2lvbi0+YXVkaW9Db2RlY1BhcmFtcy0+Y29kZWNfaWQsCiAgICAgICAgICAgICBhdmNvZGVjX2dldF9uYW1lKHNlc3Npb24tPmF1ZGlvQ29kZWNQYXJhbXMtPmNvZGVjX2lkKSk7CiAgICB9CgogICAgc2Vzc2lvbi0+Y3VycmVudFBhY2tldCA9IGF2X3BhY2tldF9hbGxvYygpOwogICAgc2Vzc2lvbi0+bGFzdFB0c1VzID0gMDsKICAgIHNlc3Npb24tPmhhc1BhY2tldCA9IGZhbHNlOwoKICAgIGVudi0+UmVsZWFzZVN0cmluZ1VURkNoYXJzKHBhdGhTdHIsIHBhdGgpOwoKICAgIExPR0QoIm5hdGl2ZU9wZW5JbnB1dCBTVUNDRVNTOiBjdHg9JXAsIGF1ZGlvU3RyZWFtPSVkIiwgc2Vzc2lvbi0+Zm10Q3R4LCBzZXNzaW9uLT5hdWRpb1N0cmVhbUluZGV4KTsKICAgIHJldHVybiAoamxvbmcpc2Vzc2lvbjsKfQoKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCi8vIDMuIG5hdGl2ZUdldEF1ZGlvVHJhY2tJbmRleCAtIOi/lOWbnumfs+mikea1gee0ouW8lSAo6LSf5pWwPeayoeaciemfs+mikSkKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCmV4dGVybiAiQyIgSk5JRVhQT1JUIGppbnQgSk5JQ0FMTApKYXZhX2NvbV93bXBsYXlfZXh0cmFjdG9yX0ZmbXBlZ0V4dHJhY3Rvcl9uYXRpdmVHZXRBdWRpb1RyYWNrSW5kZXgoCiAgICBKTklFbnYgKmVudiwgam9iamVjdCAvKnRoaXoqLywgamxvbmcgY3R4UHRyKSB7CgogICAgRGVtdXhTZXNzaW9uICpzZXNzaW9uID0gKERlbXV4U2Vzc2lvbiAqKWN0eFB0cjsKICAgIGlmICghc2Vzc2lvbiB8fCAhc2Vzc2lvbi0+Zm10Q3R4KSByZXR1cm4gLTE7CiAgICByZXR1cm4gc2Vzc2lvbi0+YXVkaW9TdHJlYW1JbmRleDsKfQoKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCi8vIDQuIG5hdGl2ZUdldENvZGVjTWltZVR5cGUgLSDov5Tlm57pn7PpopEgY29kZWMg5a+55bqU55qEIEFuZHJvaWQgTUlNRSB0eXBlCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkApleHRlcm4gIkMiIEpOSUVYUE9SVCBqc3RyaW5nIEpOSUNBTEwKSmF2YV9jb21fd21wbGF5X2V4dHJhY3Rvcl9GZm1wZWdFeHRyYWN0b3JfbmF0aXZlR2V0Q29kZWNNaW1lVHlwZSgKICAgIEpOSUVudiAqZW52LCBqb2JqZWN0IC8qdGhpeiovLCBqbG9uZyBjdHhQdHIsIGppbnQgc3RyZWFtSW5kZXgpIHsKCiAgICBEZW11eFNlc3Npb24gKnNlc3Npb24gPSAoRGVtdXhTZXNzaW9uICopY3R4UHRyOwogICAgaWYgKCFzZXNzaW9uIHx8ICFzZXNzaW9uLT5mbXRDdHgpIHJldHVybiBlbnYtPk5ld1N0cmluZ1VURigiIik7CiAgICBpZiAoc3RyZWFtSW5kZXggPCAwIHx8IHN0cmVhbUluZGV4ID49IChqaW50KXNlc3Npb24tPmZtdEN0eC0+bmJfc3RyZWFtcykgcmV0dXJuIGVudi0+TmV3U3RyaW5nVVRGKCIiKTsKCiAgICBBVkNvZGVjUGFyYW1ldGVycyAqcGFyYW1zID0gc2Vzc2lvbi0+Zm10Q3R4LT5zdHJlYW1zW3N0cmVhbUluZGV4XS0+Y29kZWNwYXI7CiAgICBjb25zdCBjaGFyICptaW1lID0gY29kZWNfdG9fbWltZShwYXJhbXMtPmNvZGVjX2lkKTsKICAgIHJldHVybiBlbnYtPk5ld1N0cmluZ1VURihtaW1lKTsKfQoKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCi8vIDUuIG5hdGl2ZUdldFNhbXBsZVJhdGUgLSDov5Tlm57ph4fmoLfnjocKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCmV4dGVybiAiQyIgSk5JRVhQT1JUIGppbnQgSk5JQ0FMTApKYXZhX2NvbV93bXBsYXlfZXh0cmFjdG9yX0ZmbXBlZ0V4dHJhY3Rvcl9uYXRpdmVHZXRTYW1wbGVSYXRlKAogICAgSk5JRW52ICplbnYsIGpvYmplY3QgLyp0aGl6Ki8sIGpsb25nIGN0eFB0ciwgamludCBzdHJlYW1JbmRleCkgewoKICAgIERlbXV4U2Vzc2lvbiAqc2Vzc2lvbiA9IChEZW11eFNlc3Npb24gKiljdHhQdHI7CiAgICBpZiAoIXNlc3Npb24gfHwgIXNlc3Npb24tPmZtdEN0eCkgcmV0dXJuIDQ0MTAwOwogICAgaWYgKHN0cmVhbUluZGV4IDwgMCB8fCBzdHJlYW1JbmRleCA+PSAoamludClzZXNzaW9uLT5mbXRDdHgtPm5iX3N0cmVhbXMpIHJldHVybiA0NDEwMDsKCiAgICBBVkNvZGVjUGFyYW1ldGVycyAqcGFyYW1zID0gc2Vzc2lvbi0+Zm10Q3R4LT5zdHJlYW1zW3N0cmVhbUluZGV4XS0+Y29kZWNwYXI7CiAgICByZXR1cm4gcGFyYW1zLT5zYW1wbGVfcmF0ZSA+IDAgPyBwYXJhbXMtPnNhbXBsZV9yYXRlIDogNDQxMDA7Cn0KCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAovLyA2LiBuYXRpdmVHZXRDaGFubmVsQ291bnQgLSDov5Tlm57lo7DpgZPmlbAKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCmV4dGVybiAiQyIgSk5JRVhQT1JUIGppbnQgSk5JQ0FMTApKYXZhX2NvbV93bXBsYXlfZXh0cmFjdG9yX0ZmbXBlZ0V4dHJhY3Rvcl9uYXRpdmVHZXRDaGFubmVsQ291bnQoCiAgICBKTklFbnYgKmVudiwgam9iamVjdCAvKnRoaXoqLywgamxvbmcgY3R4UHRyLCBqaW50IHN0cmVhbUluZGV4KSB7CgogICAgRGVtdXhTZXNzaW9uICpzZXNzaW9uID0gKERlbXV4U2Vzc2lvbiAqKWN0eFB0cjsKICAgIGlmICghc2Vzc2lvbiB8fCAhc2Vzc2lvbi0+Zm10Q3R4KSByZXR1cm4gMjsKICAgIGlmIChzdHJlYW1JbmRleCA8IDAgfHwgc3RyZWFtSW5kZXggPj0gKGppbnQpc2Vzc2lvbi0+Zm10Q3R4LT5uYl9zdHJlYW1zKSByZXR1cm4gMjsKCiAgICBBVkNvZGVjUGFyYW1ldGVycyAqcGFyYW1zID0gc2Vzc2lvbi0+Zm10Q3R4LT5zdHJlYW1zW3N0cmVhbUluZGV4XS0+Y29kZWNwYXI7CiAgICBpbnQgY2ggPSBwYXJhbXMtPmNoX2xheW91dC5uYl9jaGFubmVsczsKICAgIHJldHVybiBjaCA+IDAgPyBjaCA6IChwYXJhbXMtPmNoYW5uZWxfbGF5b3V0ID8gMiA6IDIpOwp9CgovLyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKLy8gNy4gbmF0aXZlUmVhZFBhY2tldCAtIOivu+WPluS4i+S4gOW4p+mfs+mikeaVsOaNruWMhQovLyDov5Tlm57lgLw6ID4wID0g5a2X6IqC5pWwLCAwID0gRU9GLCA8MCA9IOmUmeivrwovLyDmlbDmja7lhpnlhaXkvKDlhaXnmoQgSmF2YSBieXRlIGFycmF5Ci8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkApleHRlcm4gIkMiIEpOSUVYUE9SVCBqaW50IEpOSUNBTEwKSmF2YV9jb21fd21wbGF5X2V4dHJhY3Rvcl9GZm1wZWdFeHRyYWN0b3JfbmF0aXZlUmVhZFBhY2tldCgKICAgIEpOSUVudiAqZW52LCBqb2JqZWN0IC8qdGhpeiovLCBqbG9uZyBjdHhQdHIsIGpieXRlQXJyYXkgYnVmZmVyKSB7CgogICAgRGVtdXhTZXNzaW9uICpzZXNzaW9uID0gKERlbXV4U2Vzc2lvbiAqKWN0eFB0cjsKICAgIGlmICghc2Vzc2lvbiB8fCAhc2Vzc2lvbi0+Zm10Q3R4KSByZXR1cm4gLTE7CiAgICBpZiAoIWJ1ZmZlcikgcmV0dXJuIC0xOwoKICAgIC8vIOWmguaenOS4iuS4gOS4qiBwYWNrZXQg6L+Y5pyJ5pyq6K+755qE5pWw5o2u77yM5YWI5aSE55CG5o6J77yI5L2G5oiR5Lus5q+P5qyh6K+75a6M5pW0IHBhY2tldO+8jOaJgOS7peS4jeWtmOWcqO+8iQogICAgLy8g6YeK5pS+5LiK5LiA5LiqIHBhY2tldAogICAgaWYgKHNlc3Npb24tPmN1cnJlbnRQYWNrZXQgJiYgc2Vzc2lvbi0+aGFzUGFja2V0KSB7CiAgICAgICAgYXZfcGFja2V0X3VucmVmKHNlc3Npb24tPmN1cnJlbnRQYWNrZXQpOwogICAgICAgIHNlc3Npb24tPmhhc1BhY2tldCA9IGZhbHNlOwogICAgfQoKICAgIC8vIOW+queOr+ivu+ebtOWIsOaJvuWIsOmfs+mikea1geeahCBwYWNrZXQKICAgIGludCByZXQ7CiAgICB3aGlsZSAoKHJldCA9IGF2X3JlYWRfZnJhbWUoc2Vzc2lvbi0+Zm10Q3R4LCBzZXNzaW9uLT5jdXJyZW50UGFja2V0KSkgPj0gMCkgewogICAgICAgIGlmIChzZXNzaW9uLT5jdXJyZW50UGFja2V0LT5zdHJlYW1faW5kZXggPT0gc2Vzc2lvbi0+YXVkaW9TdHJlYW1JbmRleCkgewogICAgICAgICAgICAvLyDmib7liLDkuobpn7PpopEgcGFja2V0CiAgICAgICAgICAgIHNlc3Npb24tPmhhc1BhY2tldCA9IHRydWU7CiAgICAgICAgICAgIGJyZWFrOwogICAgICAgIH0KICAgICAgICAvLyDkuI3mmK/pn7PpopHmtYHvvIzot7Pov4cKICAgICAgICBhdl9wYWNrZXRfdW5yZWYoc2Vzc2lvbi0+Y3VycmVudFBhY2tldCk7CiAgICB9CgogICAgaWYgKHJldCA8IDApIHsKICAgICAgICAvLyBFT0Yg5oiW6ZSZ6K+vCiAgICAgICAgaWYgKHJldCA9PSBBVkVSUk9SX0VPRikgewogICAgICAgICAgICBMT0dEKCJuYXRpdmVSZWFkUGFja2V0OiBFT0YgcmVhY2hlZCIpOwogICAgICAgIH0gZWxzZSB7CiAgICAgICAgICAgIExPR1coIm5hdGl2ZVJlYWRQYWNrZXQgZXJyb3I6ICVkIiwgcmV0KTsKICAgICAgICB9CiAgICAgICAgcmV0dXJuIDA7ICAvLyAwIOihqOekuiBFT0YKICAgIH0KCiAgICAvLyDmioogcGFja2V0IOaVsOaNruaLt+WIsCBKYXZhIGJ1ZmZlcgogICAganNpemUgYnVmTGVuID0gZW52LT5HZXRBcnJheUxlbmd0aChidWZmZXIpOwogICAgaW50IHBhY2tldFNpemUgPSBzZXNzaW9uLT5jdXJyZW50UGFja2V0LT5zaXplOwogICAgaW50IGNvcHlTaXplID0gKHBhY2tldFNpemUgPCAoaW50KWJ1ZkxlbikgPyBwYWNrZXRTaXplIDogKGludClidWZMZW47CgogICAgZW52LT5TZXRCeXRlQXJyYXlSZWdpb24oYnVmZmVyLCAwLCBjb3B5U2l6ZSwgKGpieXRlICopc2Vzc2lvbi0+Y3VycmVudFBhY2tldC0+ZGF0YSk7CgogICAgLy8g6K6w5b2VIFBUUyAo6L2s5oiQ5b6u56eSKQogICAgaWYgKHNlc3Npb24tPmN1cnJlbnRQYWNrZXQtPnB0cyAhPSBBVl9OT1BUU19WQUxVRSAmJiBzZXNzaW9uLT5hdWRpb1N0cmVhbUluZGV4ID49IDApIHsKICAgICAgICBBVlN0cmVhbSAqc3RyZWFtID0gc2Vzc2lvbi0+Zm10Q3R4LT5zdHJlYW1zW3Nlc3Npb24tPmF1ZGlvU3RyZWFtSW5kZXhdOwogICAgICAgIHNlc3Npb24tPmxhc3RQdHNVcyA9IHB0c190b191cyhzZXNzaW9uLT5jdXJyZW50UGFja2V0LT5wdHMsIHN0cmVhbS0+dGltZV9iYXNlKTsKICAgIH0gZWxzZSB7CiAgICAgICAgc2Vzc2lvbi0+bGFzdFB0c1VzID0gMDsKICAgIH0KCiAgICByZXR1cm4gY29weVNpemU7Cn0KCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAovLyA4LiBuYXRpdmVHZXRQYWNrZXRQdHNVcyAtIOiOt+WPluS4iuS4gOS4qiBwYWNrZXQg55qEIFBUUyAo5b6u56eSKQovLyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKZXh0ZXJuICJDIiBKTklFWFBPUlQgamxvbmcgSk5JQ0FMTApKYXZhX2NvbV93bXBsYXlfZXh0cmFjdG9yX0ZmbXBlZ0V4dHJhY3Rvcl9uYXRpdmVHZXRQYWNrZXRQdHNVcygKICAgIEpOSUVudiAqZW52LCBqb2JqZWN0IC8qdGhpeiovLCBqbG9uZyBjdHhQdHIpIHsKCiAgICBEZW11eFNlc3Npb24gKnNlc3Npb24gPSAoRGVtdXhTZXNzaW9uICopY3R4UHRyOwogICAgaWYgKCFzZXNzaW9uKSByZXR1cm4gMDsKICAgIHJldHVybiBzZXNzaW9uLT5sYXN0UHRzVXM7Cn0KCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAovLyA5LiBuYXRpdmVTZWVrIC0g6Lez6L2s5Yiw5oyH5a6a5pe26Ze0ICjlvq7np5IpCi8vIOi/lOWbniAwPeaIkOWKnywg6Z2e6Zu2PeWksei0pQovLyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKZXh0ZXJuICJDIiBKTklFWFBPUlQgamludCBKTklDQUxMCkphdmFfY29tX3dtcGxheV9leHRyYWN0b3JfRmZtcGVnRXh0cmFjdG9yX25hdGl2ZVNlZWsoCiAgICBKTklFbnYgKmVudiwgam9iamVjdCAvKnRoaXoqLywgamxvbmcgY3R4UHRyLCBqbG9uZyB0aW1lVXMpIHsKCiAgICBEZW11eFNlc3Npb24gKnNlc3Npb24gPSAoRGVtdXhTZXNzaW9uICopY3R4UHRyOwogICAgaWYgKCFzZXNzaW9uIHx8ICFzZXNzaW9uLT5mbXRDdHgpIHJldHVybiAtMTsKICAgIGlmIChzZXNzaW9uLT5hdWRpb1N0cmVhbUluZGV4IDwgMCkgcmV0dXJuIC0xOwoKICAgIC8vIOmHiuaUvuW9k+WJjSBwYWNrZXQKICAgIGlmIChzZXNzaW9uLT5jdXJyZW50UGFja2V0ICYmIHNlc3Npb24tPmhhc1BhY2tldCkgewogICAgICAgIGF2X3BhY2tldF91bnJlZihzZXNzaW9uLT5jdXJyZW50UGFja2V0KTsKICAgICAgICBzZXNzaW9uLT5oYXNQYWNrZXQgPSBmYWxzZTsKICAgIH0KCiAgICAvLyDlvq7np5LovazmtYHml7bpl7Tln7oKICAgIEFWU3RyZWFtICpzdHJlYW0gPSBzZXNzaW9uLT5mbXRDdHgtPnN0cmVhbXNbc2Vzc2lvbi0+YXVkaW9TdHJlYW1JbmRleF07CiAgICBpbnQ2NF90IHRzID0gYXZfcmVzY2FsZV9xKHRpbWVVcywgKEFWUmF0aW9uYWwpezEsIDEwMDAwMDB9LCBzdHJlYW0tPnRpbWVfYmFzZSk7CgogICAgTE9HRCgibmF0aXZlU2VlazogdGltZVVzPSVsbGQgLT4gdHM9JWxsZCAodGltZWJhc2U9JWQvJWQpIiwKICAgICAgICAgKGxvbmcgbG9uZyl0aW1lVXMsIChsb25nIGxvbmcpdHMsIHN0cmVhbS0+dGltZV9iYXNlLm51bSwgc3RyZWFtLT50aW1lX2Jhc2UuZGVuKTsKCiAgICBpbnQgcmV0ID0gYXZfc2Vla19mcmFtZShzZXNzaW9uLT5mbXRDdHgsIHNlc3Npb24tPmF1ZGlvU3RyZWFtSW5kZXgsIHRzLCBBVlNFRUtfRkxBR19CQUNLV0FSRCk7CiAgICBpZiAocmV0IDwgMCkgewogICAgICAgIC8vIOmZjee6p++8mueUqCBhdmZvcm1hdF9zZWVrX2ZpbGUg5oiW5Zyo5pW05Liq5pe26Ze06L205LiKIHNlZWsKICAgICAgICBBVlJhdGlvbmFsIGZtdF90YiA9IHNlc3Npb24tPmZtdEN0eC0+aWZvcm1hdC0+ZmxhZ3MgJiBBVkZNVF9OT0JJTlNFQVJDSAogICAgICAgICAgICA/IHNlc3Npb24tPmZtdEN0eC0+c3RyZWFtc1swXS0+dGltZV9iYXNlCiAgICAgICAgICAgIDogKEFWUmF0aW9uYWwpezEsIEFWX1RJTUVfQkFTRX07CiAgICAgICAgaW50NjRfdCB0czIgPSBhdl9yZXNjYWxlX3EodGltZVVzLCAoQVZSYXRpb25hbCl7MSwgMTAwMDAwMH0sIGZtdF90Yik7CiAgICAgICAgcmV0ID0gYXZfc2Vla19mcmFtZShzZXNzaW9uLT5mbXRDdHgsIC0xLCB0czIsIEFWU0VFS19GTEFHX0JBQ0tXQVJEKTsKICAgICAgICBpZiAocmV0IDwgMCkgewogICAgICAgICAgICBsb2dfYXZfZXJyb3IoImF2X3NlZWtfZnJhbWUiLCByZXQpOwogICAgICAgICAgICByZXR1cm4gcmV0OwogICAgICAgIH0KICAgIH0KCiAgICAvLyDliLfmlrDop6PnoIHlmagKICAgIGF2Zm9ybWF0X2ZsdXNoKHNlc3Npb24tPmZtdEN0eCk7CiAgICBzZXNzaW9uLT5sYXN0UHRzVXMgPSB0aW1lVXM7CiAgICByZXR1cm4gMDsKfQoKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCi8vIDEwLiBuYXRpdmVDbG9zZUlucHV0IC0g5YWz6Zet5bm26YeK5pS+5omA5pyJ6LWE5rqQCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkApleHRlcm4gIkMiIEpOSUVYUE9SVCB2b2lkIEpOSUNBTEwKSmF2YV9jb21fd21wbGF5X2V4dHJhY3Rvcl9GZm1wZWdFeHRyYWN0b3JfbmF0aXZlQ2xvc2VJbnB1dCgKICAgIEpOSUVudiAqZW52LCBqb2JqZWN0IC8qdGhpeiovLCBqbG9uZyBjdHhQdHIpIHsKCiAgICBEZW11eFNlc3Npb24gKnNlc3Npb24gPSAoRGVtdXhTZXNzaW9uICopY3R4UHRyOwogICAgaWYgKCFzZXNzaW9uKSByZXR1cm47CgogICAgTE9HRCgibmF0aXZlQ2xvc2VJbnB1dDogY2xvc2luZyBjdHg9JXAiLCBzZXNzaW9uLT5mbXRDdHgpOwoKICAgIGlmIChzZXNzaW9uLT5jdXJyZW50UGFja2V0KSB7CiAgICAgICAgYXZfcGFja2V0X2ZyZWUoJnNlc3Npb24tPmN1cnJlbnRQYWNrZXQpOwogICAgICAgIHNlc3Npb24tPmN1cnJlbnRQYWNrZXQgPSBudWxscHRyOwogICAgfQogICAgaWYgKHNlc3Npb24tPmZtdEN0eCkgewogICAgICAgIGF2Zm9ybWF0X2Nsb3NlX2lucHV0KCZzZXNzaW9uLT5mbXRDdHgpOwogICAgICAgIHNlc3Npb24tPmZtdEN0eCA9IG51bGxwdHI7CiAgICB9CgogICAgZGVsZXRlIHNlc3Npb247CiAgICBMT0dEKCJuYXRpdmVDbG9zZUlucHV0IGRvbmUiKTsKfQo=" | base64 -d > "${DEMUX_JNI}"
-          echo "==== ffmpeg_demux_jni.cc 写入完成 ===="
+          echo "LyoKICogRmZtcGVnRXh0cmFjdG9yIGRlbXV4IEpOSSBicmlkZ2UKICoKICog5Li6IEtvdGxpbiDnsbsgY29tLndtcGxheS5leHRyYWN0b3IuRmZtcGVnRXh0cmFjdG9yIOaPkOS+myBuYXRpdmUg5Ye95pWw44CCCiAqIOWfuuS6jiBGRm1wZWcgYXZmb3JtYXQgQVBJIOWunueOsOWuueWZqOino+WkjeeUqCAoY29udGFpbmVyIGRlbXV4aW5nKeOAggogKgogKiDlh73mlbDlkb3lkI3moLzlvI86IEphdmFfY29tX3dtcGxheV9leHRyYWN0b3JfRmZtcGVnRXh0cmFjdG9yXzxuYW1lPgogKiAoSk5JIOinhOiMgzog5YyF5ZCN6L2s5LiL5YiS57q/ICsg57G75ZCNICsg5pa55rOV5ZCNKQogKi8KI2luY2x1ZGUgPGFuZHJvaWQvbG9nLmg+CiNpbmNsdWRlIDxqbmkuaD4KI2luY2x1ZGUgPHN0ZGxpYi5oPgojaW5jbHVkZSA8c3RyaW5nLmg+CgpleHRlcm4gIkMiIHsKI2RlZmluZSBfX1NURENfQ09OU1RBTlRfTUFDUk9TCiNpZmRlZiBfU1RESU5UX0gKI3VuZGVmIF9TVERJTlRfSAojZW5kaWYKI2luY2x1ZGUgPHN0ZGludC5oPgojaW5jbHVkZSA8bGliYXZmb3JtYXQvYXZmb3JtYXQuaD4KI2luY2x1ZGUgPGxpYmF2Y29kZWMvYXZjb2RlYy5oPgojaW5jbHVkZSA8bGliYXZ1dGlsL2Vycm9yLmg+CiNpbmNsdWRlIDxsaWJhdnV0aWwvb3B0Lmg+Cn0KCiNkZWZpbmUgTE9HX1RBRyAiZmZtcGVnX2RlbXV4IgojZGVmaW5lIExPR0UoLi4uKSAoKHZvaWQpX19hbmRyb2lkX2xvZ19wcmludChBTkRST0lEX0xPR19FUlJPUiwgTE9HX1RBRywgX19WQV9BUkdTX18pKQojZGVmaW5lIExPR0QoLi4uKSAoKHZvaWQpX19hbmRyb2lkX2xvZ19wcmludChBTkRST0lEX0xPR19ERUJVRywgTE9HX1RBRywgX19WQV9BUkdTX18pKQojZGVmaW5lIExPR1coLi4uKSAoKHZvaWQpX19hbmRyb2lkX2xvZ19wcmludChBTkRST0lEX0xPR19XQVJOLCBMT0dfVEFHLCBfX1ZBX0FSR1NfXykpCgovLyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKLy8g5YaF6YOo54q25oCB57uT5p6E5L2T77ya5bCB6KOF5LiA5qyhIGRlbXV4IHNlc3Npb24g55qE5omA5pyJ54q25oCBCi8vIEtvdGxpbiDnq6/nlKggamxvbmcg5oyB5pyJ6L+Z5Liq5oyH6ZKICi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkApzdHJ1Y3QgRGVtdXhTZXNzaW9uIHsKICAgIEFWRm9ybWF0Q29udGV4dCAqZm10Q3R4OwogICAgaW50IGF1ZGlvU3RyZWFtSW5kZXg7CiAgICBjb25zdCBBVkNvZGVjUGFyYW1ldGVycyAqYXVkaW9Db2RlY1BhcmFtczsKICAgIEFWUGFja2V0ICpjdXJyZW50UGFja2V0OyAgICAgLy8g5b2T5YmN5q2j5Zyo6K+755qEIHBhY2tldAogICAgaW50NjRfdCBsYXN0UHRzVXM7ICAgICAgICAgICAvLyDkuIrkuIDkuKogcGFja2V0IOeahCBQVFMgKOW+ruenkikKICAgIGJvb2wgaGFzUGFja2V0OyAgICAgICAgICAgICAgLy8gY3VycmVudFBhY2tldCDmmK/lkKbmnInmlbDmja4KfTsKCi8vIOagvOW8j+WMliBGRm1wZWcg6ZSZ6K+v56CBCnN0YXRpYyB2b2lkIGxvZ19hdl9lcnJvcihjb25zdCBjaGFyICpmdW5jLCBpbnQgZXJyKSB7CiAgICBjaGFyIGJ1ZlsyNTZdOwogICAgYXZfc3RyZXJyb3IoZXJyLCBidWYsIHNpemVvZihidWYpKTsKICAgIExPR0UoIiVzOiAlcyAoY29kZT0lZCkiLCBmdW5jLCBidWYsIGVycik7Cn0KCi8vIOagueaNriBGRm1wZWcgY29kZWNfaWQg5pig5bCE5YiwIEFuZHJvaWQgTWVkaWEzIE1JTUUgdHlwZQpzdGF0aWMgY29uc3QgY2hhciogY29kZWNfdG9fbWltZShBVkNvZGVjSUQgY29kZWNJZCkgewogICAgc3dpdGNoIChjb2RlY0lkKSB7CiAgICAgICAgY2FzZSBBVl9DT0RFQ19JRF9XTUFWMTogcmV0dXJuICJhdWRpby94LW1zLXdtYSI7CiAgICAgICAgY2FzZSBBVl9DT0RFQ19JRF9XTUFWMjogcmV0dXJuICJhdWRpby94LW1zLXdtYSI7CiAgICAgICAgY2FzZSBBVl9DT0RFQ19JRF9XTUFQUk86IHJldHVybiAiYXVkaW8veC1tcy13bWEiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfV01BTE9TU0xFU1M6IHJldHVybiAiYXVkaW8veC1tcy13bWEiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfQVBFOiByZXR1cm4gImF1ZGlvL2FwZSI7CiAgICAgICAgY2FzZSBBVl9DT0RFQ19JRF9GTEFDOiByZXR1cm4gImF1ZGlvL2ZsYWMiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfTVAzOiByZXR1cm4gImF1ZGlvL21wZWciOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfQUFDOiByZXR1cm4gImF1ZGlvL21wNGEtbGF0bSI7CiAgICAgICAgY2FzZSBBVl9DT0RFQ19JRF9PUFVTOiByZXR1cm4gImF1ZGlvL29wdXMiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfVk9SQklTOiByZXR1cm4gImF1ZGlvL3ZvcmJpcyI7CiAgICAgICAgY2FzZSBBVl9DT0RFQ19JRF9BTEFDOiByZXR1cm4gImF1ZGlvL2FsYWMiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfQUMzOiByZXR1cm4gImF1ZGlvL2FjMyI7CiAgICAgICAgY2FzZSBBVl9DT0RFQ19JRF9FQUMzOiByZXR1cm4gImF1ZGlvL2VhYzMiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfUENNX1MxNkxFOiByZXR1cm4gImF1ZGlvL2wxNiI7CiAgICAgICAgY2FzZSBBVl9DT0RFQ19JRF9QQ01fUzE2QkU6IHJldHVybiAiYXVkaW8vbDE2IjsKICAgICAgICBjYXNlIEFWX0NPREVDX0lEX1BDTV9VODogcmV0dXJuICJhdWRpby9sMTYiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfUENNX0FMQVc6IHJldHVybiAiYXVkaW8vZzcxMWEiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfUENNX01VTEFXOiByZXR1cm4gImF1ZGlvL2c3MTF1IjsKICAgICAgICBjYXNlIEFWX0NPREVDX0lEX1BDTV9GMzJMRTogcmV0dXJuICJhdWRpby9sMTYiOwogICAgICAgIGNhc2UgQVZfQ09ERUNfSURfUENNX0YzMkJFOiByZXR1cm4gImF1ZGlvL2wxNiI7CiAgICAgICAgZGVmYXVsdDoKICAgICAgICAgICAgTE9HRSgiVW5rbm93biBjb2RlYyBpZDogJWQiLCBjb2RlY0lkKTsKICAgICAgICAgICAgcmV0dXJuICJhdWRpby94LWZmbXBlZyI7ICAvLyBmYWxsYmFjawogICAgfQp9CgovLyDml7bpl7Tln7rovazlvq7np5IKc3RhdGljIGludDY0X3QgcHRzX3RvX3VzKGludDY0X3QgcHRzLCBBVlJhdGlvbmFsIHRpbWVCYXNlKSB7CiAgICBpZiAocHRzID09IEFWX05PUFRTX1ZBTFVFKSByZXR1cm4gQVZfTk9QVFNfVkFMVUU7CiAgICByZXR1cm4gYXZfcmVzY2FsZV9xKHB0cywgdGltZUJhc2UsIChBVlJhdGlvbmFsKXsxLCAxMDAwMDAwfSk7Cn0KCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAovLyAxLiBuYXRpdmVQcm9iZURhdGEgLSDmjqLmtYsgMTYg5a2X6IqCIGhlYWRlciDliKTmlq0gRkZtcGVnIOiDveivhuWIq+eahOagvOW8jwovLyDov5Tlm54gdHJ1ZSDooajnpLogRkZtcGVnIOiDveWkhOeQhui/meS4quaWh+S7tgovLyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKZXh0ZXJuICJDIiBKTklFWFBPUlQgamJvb2xlYW4gSk5JQ0FMTApKYXZhX2NvbV93bXBsYXlfZXh0cmFjdG9yX0ZmbXBlZ0V4dHJhY3Rvcl9uYXRpdmVQcm9iZURhdGEoCiAgICBKTklFbnYgKmVudiwgam9iamVjdCAvKnRoaXoqLywgamJ5dGVBcnJheSBoZWFkZXJCeXRlcykgewoKICAgIGlmICghaGVhZGVyQnl0ZXMpIHJldHVybiBKTklfRkFMU0U7CiAgICBqc2l6ZSBsZW4gPSBlbnYtPkdldEFycmF5TGVuZ3RoKGhlYWRlckJ5dGVzKTsKICAgIGlmIChsZW4gPCA0KSByZXR1cm4gSk5JX0ZBTFNFOwoKICAgIHVpbnQ4X3QgKmJ1ZiA9ICh1aW50OF90ICopZW52LT5HZXRCeXRlQXJyYXlFbGVtZW50cyhoZWFkZXJCeXRlcywgTlVMTCk7CiAgICBpZiAoIWJ1ZikgcmV0dXJuIEpOSV9GQUxTRTsKCiAgICBBVlByb2JlRGF0YSBwZDsKICAgIG1lbXNldCgmcGQsIDAsIHNpemVvZihwZCkpOwogICAgcGQuYnVmID0gYnVmOwogICAgcGQuYnVmX3NpemUgPSBsZW47CiAgICBwZC5maWxlbmFtZSA9ICIiOwoKICAgIGNvbnN0IEFWSW5wdXRGb3JtYXQgKmZtdCA9IGF2X3Byb2JlX2lucHV0X2Zvcm1hdCgmcGQsIDApOwoKICAgIGVudi0+UmVsZWFzZUJ5dGVBcnJheUVsZW1lbnRzKGhlYWRlckJ5dGVzLCAoamJ5dGUqKWJ1ZiwgSk5JX0FCT1JUKTsKCiAgICBpZiAoZm10KSB7CiAgICAgICAgTE9HRCgicHJvYmUgT0s6IGZvcm1hdD0lcyAobmFtZT0lcykiLCBmbXQtPmxvbmdfbmFtZSA/IGZtdC0+bG9uZ19uYW1lIDogIj8iLCBmbXQtPm5hbWUpOwogICAgICAgIHJldHVybiBKTklfVFJVRTsKICAgIH0KICAgIHJldHVybiBKTklfRkFMU0U7Cn0KCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAovLyAyLiBuYXRpdmVPcGVuSW5wdXQgLSDmiZPlvIDmnKzlnLDmlofku7bvvIzov5Tlm54gRGVtdXhTZXNzaW9uKiDkvZzkuLogamxvbmcKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCmV4dGVybiAiQyIgSk5JRVhQT1JUIGpsb25nIEpOSUNBTEwKSmF2YV9jb21fd21wbGF5X2V4dHJhY3Rvcl9GZm1wZWdFeHRyYWN0b3JfbmF0aXZlT3BlbklucHV0KAogICAgSk5JRW52ICplbnYsIGpvYmplY3QgLyp0aGl6Ki8sIGpzdHJpbmcgcGF0aFN0cikgewoKICAgIGlmICghcGF0aFN0cikgcmV0dXJuIDA7CiAgICBjb25zdCBjaGFyICpwYXRoID0gZW52LT5HZXRTdHJpbmdVVEZDaGFycyhwYXRoU3RyLCBOVUxMKTsKICAgIGlmICghcGF0aCkgcmV0dXJuIDA7CgogICAgTE9HRCgibmF0aXZlT3BlbklucHV0OiAlcyIsIHBhdGgpOwoKICAgIERlbXV4U2Vzc2lvbiAqc2Vzc2lvbiA9IG5ldyBEZW11eFNlc3Npb24oKTsKICAgIG1lbXNldChzZXNzaW9uLCAwLCBzaXplb2YoKnNlc3Npb24pKTsKCiAgICAvLyDlv4XpobvlhYjosIPnlKggYXZmb3JtYXRfbmV0d29ya19pbml077yI6Jm954S25oiR5Lus5Y+q55So5pys5Zyw5paH5Lu277yM5L2G5p+Q5Lqb5Y2P6K6u5Lya55So5Yiw77yJCiAgICAvLyDlhbblrp7mnKzlnLDmlofku7bkuI3pnIDopoHvvIzot7Pov4cKCiAgICAvLyDnlKggYXZmb3JtYXRfb3Blbl9pbnB1dCDmiZPlvIAKICAgIGludCByZXQgPSBhdmZvcm1hdF9vcGVuX2lucHV0KCZzZXNzaW9uLT5mbXRDdHgsIHBhdGgsIE5VTEwsIE5VTEwpOwogICAgaWYgKHJldCA8IDApIHsKICAgICAgICBsb2dfYXZfZXJyb3IoImF2Zm9ybWF0X29wZW5faW5wdXQiLCByZXQpOwogICAgICAgIGRlbGV0ZSBzZXNzaW9uOwogICAgICAgIGVudi0+UmVsZWFzZVN0cmluZ1VURkNoYXJzKHBhdGhTdHIsIHBhdGgpOwogICAgICAgIHJldHVybiAwOwogICAgfQoKICAgIC8vIOaJvuWIsOmfs+mikea1gQogICAgcmV0ID0gYXZmb3JtYXRfZmluZF9zdHJlYW1faW5mbyhzZXNzaW9uLT5mbXRDdHgsIE5VTEwpOwogICAgaWYgKHJldCA8IDApIHsKICAgICAgICBsb2dfYXZfZXJyb3IoImF2Zm9ybWF0X2ZpbmRfc3RyZWFtX2luZm8iLCByZXQpOwogICAgICAgIGF2Zm9ybWF0X2Nsb3NlX2lucHV0KCZzZXNzaW9uLT5mbXRDdHgpOwogICAgICAgIGRlbGV0ZSBzZXNzaW9uOwogICAgICAgIGVudi0+UmVsZWFzZVN0cmluZ1VURkNoYXJzKHBhdGhTdHIsIHBhdGgpOwogICAgICAgIHJldHVybiAwOwogICAgfQoKICAgIC8vIOmBjeWOhuaJvuesrOS4gOS4qumfs+mikea1gQogICAgc2Vzc2lvbi0+YXVkaW9TdHJlYW1JbmRleCA9IC0xOwogICAgZm9yICh1bnNpZ25lZCBpID0gMDsgaSA8IHNlc3Npb24tPmZtdEN0eC0+bmJfc3RyZWFtczsgaSsrKSB7CiAgICAgICAgQVZNZWRpYVR5cGUgdHlwZSA9IHNlc3Npb24tPmZtdEN0eC0+c3RyZWFtc1tpXS0+Y29kZWNwYXItPmNvZGVjX3R5cGU7CiAgICAgICAgaWYgKHR5cGUgPT0gQVZNRURJQV9UWVBFX0FVRElPKSB7CiAgICAgICAgICAgIHNlc3Npb24tPmF1ZGlvU3RyZWFtSW5kZXggPSAoaW50KWk7CiAgICAgICAgICAgIGJyZWFrOwogICAgICAgIH0KICAgIH0KCiAgICBpZiAoc2Vzc2lvbi0+YXVkaW9TdHJlYW1JbmRleCA+PSAwKSB7CiAgICAgICAgc2Vzc2lvbi0+YXVkaW9Db2RlY1BhcmFtcyA9IHNlc3Npb24tPmZtdEN0eC0+c3RyZWFtc1tzZXNzaW9uLT5hdWRpb1N0cmVhbUluZGV4XS0+Y29kZWNwYXI7CiAgICAgICAgTE9HRCgiYXVkaW8gc3RyZWFtPSVkLCBjb2RlY19pZD0lZCwgY29kZWNfbmFtZT0lcyIsCiAgICAgICAgICAgICBzZXNzaW9uLT5hdWRpb1N0cmVhbUluZGV4LAogICAgICAgICAgICAgc2Vzc2lvbi0+YXVkaW9Db2RlY1BhcmFtcy0+Y29kZWNfaWQsCiAgICAgICAgICAgICBhdmNvZGVjX2dldF9uYW1lKHNlc3Npb24tPmF1ZGlvQ29kZWNQYXJhbXMtPmNvZGVjX2lkKSk7CiAgICB9CgogICAgc2Vzc2lvbi0+Y3VycmVudFBhY2tldCA9IGF2X3BhY2tldF9hbGxvYygpOwogICAgc2Vzc2lvbi0+bGFzdFB0c1VzID0gMDsKICAgIHNlc3Npb24tPmhhc1BhY2tldCA9IGZhbHNlOwoKICAgIGVudi0+UmVsZWFzZVN0cmluZ1VURkNoYXJzKHBhdGhTdHIsIHBhdGgpOwoKICAgIExPR0QoIm5hdGl2ZU9wZW5JbnB1dCBTVUNDRVNTOiBjdHg9JXAsIGF1ZGlvU3RyZWFtPSVkIiwgc2Vzc2lvbi0+Zm10Q3R4LCBzZXNzaW9uLT5hdWRpb1N0cmVhbUluZGV4KTsKICAgIHJldHVybiAoamxvbmcpc2Vzc2lvbjsKfQoKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCi8vIDMuIG5hdGl2ZUdldEF1ZGlvVHJhY2tJbmRleCAtIOi/lOWbnumfs+mikea1gee0ouW8lSAo6LSf5pWwPeayoeaciemfs+mikSkKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCmV4dGVybiAiQyIgSk5JRVhQT1JUIGppbnQgSk5JQ0FMTApKYXZhX2NvbV93bXBsYXlfZXh0cmFjdG9yX0ZmbXBlZ0V4dHJhY3Rvcl9uYXRpdmVHZXRBdWRpb1RyYWNrSW5kZXgoCiAgICBKTklFbnYgKmVudiwgam9iamVjdCAvKnRoaXoqLywgamxvbmcgY3R4UHRyKSB7CgogICAgRGVtdXhTZXNzaW9uICpzZXNzaW9uID0gKERlbXV4U2Vzc2lvbiAqKWN0eFB0cjsKICAgIGlmICghc2Vzc2lvbiB8fCAhc2Vzc2lvbi0+Zm10Q3R4KSByZXR1cm4gLTE7CiAgICByZXR1cm4gc2Vzc2lvbi0+YXVkaW9TdHJlYW1JbmRleDsKfQoKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCi8vIDQuIG5hdGl2ZUdldENvZGVjTWltZVR5cGUgLSDov5Tlm57pn7PpopEgY29kZWMg5a+55bqU55qEIEFuZHJvaWQgTUlNRSB0eXBlCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkApleHRlcm4gIkMiIEpOSUVYUE9SVCBqc3RyaW5nIEpOSUNBTEwKSmF2YV9jb21fd21wbGF5X2V4" | base64 -d > "${DEMUX_JNI}"
+          echo "dHJhY3Rvcl9GZm1wZWdFeHRyYWN0b3JfbmF0aXZlR2V0Q29kZWNNaW1lVHlwZSgKICAgIEpOSUVudiAqZW52LCBqb2JqZWN0IC8qdGhpeiovLCBqbG9uZyBjdHhQdHIsIGppbnQgc3RyZWFtSW5kZXgpIHsKCiAgICBEZW11eFNlc3Npb24gKnNlc3Npb24gPSAoRGVtdXhTZXNzaW9uICopY3R4UHRyOwogICAgaWYgKCFzZXNzaW9uIHx8ICFzZXNzaW9uLT5mbXRDdHgpIHJldHVybiBlbnYtPk5ld1N0cmluZ1VURigiIik7CiAgICBpZiAoc3RyZWFtSW5kZXggPCAwIHx8IHN0cmVhbUluZGV4ID49IChqaW50KXNlc3Npb24tPmZtdEN0eC0+bmJfc3RyZWFtcykgcmV0dXJuIGVudi0+TmV3U3RyaW5nVVRGKCIiKTsKCiAgICBBVkNvZGVjUGFyYW1ldGVycyAqcGFyYW1zID0gc2Vzc2lvbi0+Zm10Q3R4LT5zdHJlYW1zW3N0cmVhbUluZGV4XS0+Y29kZWNwYXI7CiAgICBjb25zdCBjaGFyICptaW1lID0gY29kZWNfdG9fbWltZShwYXJhbXMtPmNvZGVjX2lkKTsKICAgIHJldHVybiBlbnYtPk5ld1N0cmluZ1VURihtaW1lKTsKfQoKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCi8vIDUuIG5hdGl2ZUdldFNhbXBsZVJhdGUgLSDov5Tlm57ph4fmoLfnjocKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCmV4dGVybiAiQyIgSk5JRVhQT1JUIGppbnQgSk5JQ0FMTApKYXZhX2NvbV93bXBsYXlfZXh0cmFjdG9yX0ZmbXBlZ0V4dHJhY3Rvcl9uYXRpdmVHZXRTYW1wbGVSYXRlKAogICAgSk5JRW52ICplbnYsIGpvYmplY3QgLyp0aGl6Ki8sIGpsb25nIGN0eFB0ciwgamludCBzdHJlYW1JbmRleCkgewoKICAgIERlbXV4U2Vzc2lvbiAqc2Vzc2lvbiA9IChEZW11eFNlc3Npb24gKiljdHhQdHI7CiAgICBpZiAoIXNlc3Npb24gfHwgIXNlc3Npb24tPmZtdEN0eCkgcmV0dXJuIDQ0MTAwOwogICAgaWYgKHN0cmVhbUluZGV4IDwgMCB8fCBzdHJlYW1JbmRleCA+PSAoamludClzZXNzaW9uLT5mbXRDdHgtPm5iX3N0cmVhbXMpIHJldHVybiA0NDEwMDsKCiAgICBBVkNvZGVjUGFyYW1ldGVycyAqcGFyYW1zID0gc2Vzc2lvbi0+Zm10Q3R4LT5zdHJlYW1zW3N0cmVhbUluZGV4XS0+Y29kZWNwYXI7CiAgICByZXR1cm4gcGFyYW1zLT5zYW1wbGVfcmF0ZSA+IDAgPyBwYXJhbXMtPnNhbXBsZV9yYXRlIDogNDQxMDA7Cn0KCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAovLyA2LiBuYXRpdmVHZXRDaGFubmVsQ291bnQgLSDov5Tlm57lo7DpgZPmlbAKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCmV4dGVybiAiQyIgSk5JRVhQT1JUIGppbnQgSk5JQ0FMTApKYXZhX2NvbV93bXBsYXlfZXh0cmFjdG9yX0ZmbXBlZ0V4dHJhY3Rvcl9uYXRpdmVHZXRDaGFubmVsQ291bnQoCiAgICBKTklFbnYgKmVudiwgam9iamVjdCAvKnRoaXoqLywgamxvbmcgY3R4UHRyLCBqaW50IHN0cmVhbUluZGV4KSB7CgogICAgRGVtdXhTZXNzaW9uICpzZXNzaW9uID0gKERlbXV4U2Vzc2lvbiAqKWN0eFB0cjsKICAgIGlmICghc2Vzc2lvbiB8fCAhc2Vzc2lvbi0+Zm10Q3R4KSByZXR1cm4gMjsKICAgIGlmIChzdHJlYW1JbmRleCA8IDAgfHwgc3RyZWFtSW5kZXggPj0gKGppbnQpc2Vzc2lvbi0+Zm10Q3R4LT5uYl9zdHJlYW1zKSByZXR1cm4gMjsKCiAgICBBVkNvZGVjUGFyYW1ldGVycyAqcGFyYW1zID0gc2Vzc2lvbi0+Zm10Q3R4LT5zdHJlYW1zW3N0cmVhbUluZGV4XS0+Y29kZWNwYXI7CiAgICBpbnQgY2ggPSBwYXJhbXMtPmNoX2xheW91dC5uYl9jaGFubmVsczsKICAgIHJldHVybiBjaCA+IDAgPyBjaCA6IChwYXJhbXMtPmNoYW5uZWxfbGF5b3V0ID8gMiA6IDIpOwp9CgovLyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKLy8gNy4gbmF0aXZlUmVhZFBhY2tldCAtIOivu+WPluS4i+S4gOW4p+mfs+mikeaVsOaNruWMhQovLyDov5Tlm57lgLw6ID4wID0g5a2X6IqC5pWwLCAwID0gRU9GLCA8MCA9IOmUmeivrwovLyDmlbDmja7lhpnlhaXkvKDlhaXnmoQgSmF2YSBieXRlIGFycmF5Ci8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkApleHRlcm4gIkMiIEpOSUVYUE9SVCBqaW50IEpOSUNBTEwKSmF2YV9jb21fd21wbGF5X2V4dHJhY3Rvcl9GZm1wZWdFeHRyYWN0b3JfbmF0aXZlUmVhZFBhY2tldCgKICAgIEpOSUVudiAqZW52LCBqb2JqZWN0IC8qdGhpeiovLCBqbG9uZyBjdHhQdHIsIGpieXRlQXJyYXkgYnVmZmVyKSB7CgogICAgRGVtdXhTZXNzaW9uICpzZXNzaW9uID0gKERlbXV4U2Vzc2lvbiAqKWN0eFB0cjsKICAgIGlmICghc2Vzc2lvbiB8fCAhc2Vzc2lvbi0+Zm10Q3R4KSByZXR1cm4gLTE7CiAgICBpZiAoIWJ1ZmZlcikgcmV0dXJuIC0xOwoKICAgIC8vIOWmguaenOS4iuS4gOS4qiBwYWNrZXQg6L+Y5pyJ5pyq6K+755qE5pWw5o2u77yM5YWI5aSE55CG5o6J77yI5L2G5oiR5Lus5q+P5qyh6K+75a6M5pW0IHBhY2tldO+8jOaJgOS7peS4jeWtmOWcqO+8iQogICAgLy8g6YeK5pS+5LiK5LiA5LiqIHBhY2tldAogICAgaWYgKHNlc3Npb24tPmN1cnJlbnRQYWNrZXQgJiYgc2Vzc2lvbi0+aGFzUGFja2V0KSB7CiAgICAgICAgYXZfcGFja2V0X3VucmVmKHNlc3Npb24tPmN1cnJlbnRQYWNrZXQpOwogICAgICAgIHNlc3Npb24tPmhhc1BhY2tldCA9IGZhbHNlOwogICAgfQoKICAgIC8vIOW+queOr+ivu+ebtOWIsOaJvuWIsOmfs+mikea1geeahCBwYWNrZXQKICAgIGludCByZXQ7CiAgICB3aGlsZSAoKHJldCA9IGF2X3JlYWRfZnJhbWUoc2Vzc2lvbi0+Zm10Q3R4LCBzZXNzaW9uLT5jdXJyZW50UGFja2V0KSkgPj0gMCkgewogICAgICAgIGlmIChzZXNzaW9uLT5jdXJyZW50UGFja2V0LT5zdHJlYW1faW5kZXggPT0gc2Vzc2lvbi0+YXVkaW9TdHJlYW1JbmRleCkgewogICAgICAgICAgICAvLyDmib7liLDkuobpn7PpopEgcGFja2V0CiAgICAgICAgICAgIHNlc3Npb24tPmhhc1BhY2tldCA9IHRydWU7CiAgICAgICAgICAgIGJyZWFrOwogICAgICAgIH0KICAgICAgICAvLyDkuI3mmK/pn7PpopHmtYHvvIzot7Pov4cKICAgICAgICBhdl9wYWNrZXRfdW5yZWYoc2Vzc2lvbi0+Y3VycmVudFBhY2tldCk7CiAgICB9CgogICAgaWYgKHJldCA8IDApIHsKICAgICAgICAvLyBFT0Yg5oiW6ZSZ6K+vCiAgICAgICAgaWYgKHJldCA9PSBBVkVSUk9SX0VPRikgewogICAgICAgICAgICBMT0dEKCJuYXRpdmVSZWFkUGFja2V0OiBFT0YgcmVhY2hlZCIpOwogICAgICAgIH0gZWxzZSB7CiAgICAgICAgICAgIExPR1coIm5hdGl2ZVJlYWRQYWNrZXQgZXJyb3I6ICVkIiwgcmV0KTsKICAgICAgICB9CiAgICAgICAgcmV0dXJuIDA7ICAvLyAwIOihqOekuiBFT0YKICAgIH0KCiAgICAvLyDmioogcGFja2V0IOaVsOaNruaLt+WIsCBKYXZhIGJ1ZmZlcgogICAganNpemUgYnVmTGVuID0gZW52LT5HZXRBcnJheUxlbmd0aChidWZmZXIpOwogICAgaW50IHBhY2tldFNpemUgPSBzZXNzaW9uLT5jdXJyZW50UGFja2V0LT5zaXplOwogICAgaW50IGNvcHlTaXplID0gKHBhY2tldFNpemUgPCAoaW50KWJ1ZkxlbikgPyBwYWNrZXRTaXplIDogKGludClidWZMZW47CgogICAgZW52LT5TZXRCeXRlQXJyYXlSZWdpb24oYnVmZmVyLCAwLCBjb3B5U2l6ZSwgKGpieXRlICopc2Vzc2lvbi0+Y3VycmVudFBhY2tldC0+ZGF0YSk7CgogICAgLy8g6K6w5b2VIFBUUyAo6L2s5oiQ5b6u56eSKQogICAgaWYgKHNlc3Npb24tPmN1cnJlbnRQYWNrZXQtPnB0cyAhPSBBVl9OT1BUU19WQUxVRSAmJiBzZXNzaW9uLT5hdWRpb1N0cmVhbUluZGV4ID49IDApIHsKICAgICAgICBBVlN0cmVhbSAqc3RyZWFtID0gc2Vzc2lvbi0+Zm10Q3R4LT5zdHJlYW1zW3Nlc3Npb24tPmF1ZGlvU3RyZWFtSW5kZXhdOwogICAgICAgIHNlc3Npb24tPmxhc3RQdHNVcyA9IHB0c190b191cyhzZXNzaW9uLT5jdXJyZW50UGFja2V0LT5wdHMsIHN0cmVhbS0+dGltZV9iYXNlKTsKICAgIH0gZWxzZSB7CiAgICAgICAgc2Vzc2lvbi0+bGFzdFB0c1VzID0gMDsKICAgIH0KCiAgICByZXR1cm4gY29weVNpemU7Cn0KCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAovLyA4LiBuYXRpdmVHZXRQYWNrZXRQdHNVcyAtIOiOt+WPluS4iuS4gOS4qiBwYWNrZXQg55qEIFBUUyAo5b6u56eSKQovLyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKZXh0ZXJuICJDIiBKTklFWFBPUlQgamxvbmcgSk5JQ0FMTApKYXZhX2NvbV93bXBsYXlfZXh0cmFjdG9yX0ZmbXBlZ0V4dHJhY3Rvcl9uYXRpdmVHZXRQYWNrZXRQdHNVcygKICAgIEpOSUVudiAqZW52LCBqb2JqZWN0IC8qdGhpeiovLCBqbG9uZyBjdHhQdHIpIHsKCiAgICBEZW11eFNlc3Npb24gKnNlc3Npb24gPSAoRGVtdXhTZXNzaW9uICopY3R4UHRyOwogICAgaWYgKCFzZXNzaW9uKSByZXR1cm4gMDsKICAgIHJldHVybiBzZXNzaW9uLT5sYXN0UHRzVXM7Cn0KCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAovLyA5LiBuYXRpdmVTZWVrIC0g6Lez6L2s5Yiw5oyH5a6a5pe26Ze0ICjlvq7np5IpCi8vIOi/lOWbniAwPeaIkOWKnywg6Z2e6Zu2PeWksei0pQovLyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKZXh0ZXJuICJDIiBKTklFWFBPUlQgamludCBKTklDQUxMCkphdmFfY29tX3dtcGxheV9leHRyYWN0b3JfRmZtcGVnRXh0cmFjdG9yX25hdGl2ZVNlZWsoCiAgICBKTklFbnYgKmVudiwgam9iamVjdCAvKnRoaXoqLywgamxvbmcgY3R4UHRyLCBqbG9uZyB0aW1lVXMpIHsKCiAgICBEZW11eFNlc3Npb24gKnNlc3Npb24gPSAoRGVtdXhTZXNzaW9uICopY3R4UHRyOwogICAgaWYgKCFzZXNzaW9uIHx8ICFzZXNzaW9uLT5mbXRDdHgpIHJldHVybiAtMTsKICAgIGlmIChzZXNzaW9uLT5hdWRpb1N0cmVhbUluZGV4IDwgMCkgcmV0dXJuIC0xOwoKICAgIC8vIOmHiuaUvuW9k+WJjSBwYWNrZXQKICAgIGlmIChzZXNzaW9uLT5jdXJyZW50UGFja2V0ICYmIHNlc3Npb24tPmhhc1BhY2tldCkgewogICAgICAgIGF2X3BhY2tldF91bnJlZihzZXNzaW9uLT5jdXJyZW50UGFja2V0KTsKICAgICAgICBzZXNzaW9uLT5oYXNQYWNrZXQgPSBmYWxzZTsKICAgIH0KCiAgICAvLyDlvq7np5LovazmtYHml7bpl7Tln7oKICAgIEFWU3RyZWFtICpzdHJlYW0gPSBzZXNzaW9uLT5mbXRDdHgtPnN0cmVhbXNbc2Vzc2lvbi0+YXVkaW9TdHJlYW1JbmRleF07CiAgICBpbnQ2NF90IHRzID0gYXZfcmVzY2FsZV9xKHRpbWVVcywgKEFWUmF0aW9uYWwpezEsIDEwMDAwMDB9LCBzdHJlYW0tPnRpbWVfYmFzZSk7CgogICAgTE9HRCgibmF0aXZlU2VlazogdGltZVVzPSVsbGQgLT4gdHM9JWxsZCAodGltZWJhc2U9JWQvJWQpIiwKICAgICAgICAgKGxvbmcgbG9uZyl0aW1lVXMsIChsb25nIGxvbmcpdHMsIHN0cmVhbS0+dGltZV9iYXNlLm51bSwgc3RyZWFtLT50aW1lX2Jhc2UuZGVuKTsKCiAgICBpbnQgcmV0ID0gYXZfc2Vla19mcmFtZShzZXNzaW9uLT5mbXRDdHgsIHNlc3Npb24tPmF1ZGlvU3RyZWFtSW5kZXgsIHRzLCBBVlNFRUtfRkxBR19CQUNLV0FSRCk7CiAgICBpZiAocmV0IDwgMCkgewogICAgICAgIC8vIOmZjee6p++8mueUqCBhdmZvcm1hdF9zZWVrX2ZpbGUg5oiW5Zyo5pW05Liq5pe26Ze06L205LiKIHNlZWsKICAgICAgICBBVlJhdGlvbmFsIGZtdF90YiA9IHNlc3Npb24tPmZtdEN0eC0+aWZvcm1hdC0+ZmxhZ3MgJiBBVkZNVF9OT0JJTlNFQVJDSAogICAgICAgICAgICA/IHNlc3Npb24tPmZtdEN0eC0+c3RyZWFtc1swXS0+dGltZV9iYXNlCiAgICAgICAgICAgIDogKEFWUmF0aW9uYWwpezEsIEFWX1RJTUVfQkFTRX07CiAgICAgICAgaW50NjRfdCB0czIgPSBhdl9yZXNjYWxlX3EodGltZVVzLCAoQVZSYXRpb25hbCl7MSwgMTAwMDAwMH0sIGZtdF90Yik7CiAgICAgICAgcmV0ID0gYXZfc2Vla19mcmFtZShzZXNzaW9uLT5mbXRDdHgsIC0xLCB0czIsIEFWU0VFS19GTEFHX0JBQ0tXQVJEKTsKICAgICAgICBpZiAocmV0IDwgMCkgewogICAgICAgICAgICBsb2dfYXZfZXJyb3IoImF2X3NlZWtfZnJhbWUiLCByZXQpOwogICAgICAgICAgICByZXR1cm4gcmV0OwogICAgICAgIH0KICAgIH0KCiAgICAvLyDliLfmlrDop6PnoIHlmagKICAgIGF2Zm9ybWF0X2ZsdXNoKHNlc3Npb24tPmZtdEN0eCk7CiAgICBzZXNzaW9uLT5sYXN0UHRzVXMgPSB0aW1lVXM7CiAgICByZXR1cm4gMDsKfQoKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCi8vIDEwLiBuYXRpdmVDbG9zZUlucHV0IC0g5YWz6Zet5bm26YeK5pS+5omA5pyJ6LWE5rqQCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkApleHRlcm4gIkMiIEpOSUVYUE9SVCB2b2lkIEpOSUNBTEwKSmF2YV9jb21fd21wbGF5X2V4dHJhY3Rvcl9GZm1wZWdFeHRyYWN0b3JfbmF0aXZlQ2xvc2VJbnB1dCgKICAgIEpOSUVudiAqZW52LCBqb2JqZWN0IC8qdGhpeiovLCBqbG9uZyBjdHhQdHIpIHsKCiAgICBEZW11eFNlc3Npb24gKnNlc3Npb24gPSAoRGVtdXhTZXNzaW9uICopY3R4UHRyOwogICAgaWYgKCFzZXNzaW9uKSByZXR1cm47CgogICAgTE9HRCgibmF0aXZlQ2xvc2VJbnB1dDogY2xvc2luZyBjdHg9JXAiLCBzZXNzaW9uLT5mbXRDdHgpOwoKICAgIGlmIChzZXNzaW9uLT5jdXJyZW50UGFja2V0KSB7CiAgICAgICAgYXZfcGFja2V0X2ZyZWUoJnNlc3Npb24tPmN1cnJlbnRQYWNrZXQpOwogICAgICAgIHNlc3Npb24tPmN1cnJlbnRQYWNrZXQgPSBudWxscHRyOwogICAgfQogICAgaWYgKHNlc3Npb24tPmZtdEN0eCkgewogICAgICAgIGF2Zm9ybWF0X2Nsb3NlX2lucHV0KCZzZXNzaW9uLT5mbXRDdHgpOwogICAgICAgIHNlc3Npb24tPmZtdEN0eCA9IG51bGxwdHI7CiAgICB9CgogICAgZGVsZXRlIHNlc3Npb247CiAgICBMT0dEKCJuYXRpdmVDbG9zZUlucHV0IGRvbmUiKTsKfQo=" | base64 -d >> "${DEMUX_JNI}"
+          echo "==== ffmpeg_demux_jni.cc 鍐欏叆瀹屾垚 ===="
           wc -l "${DEMUX_JNI}"
           head -5 "${DEMUX_JNI}"
 
-      # ===================== 6. ⭐️ Patch CMakeLists.txt + 编译 AAR =====================
-      - name: "[Gradle] Patch CMakeLists.txt 加 avformat + demux_jni.cc + 编译 AAR"
+      # ===================== 6. 猸愶笍 Patch CMakeLists.txt + 缂栬瘧 AAR =====================
+      - name: "[Gradle] Patch CMakeLists.txt 鍔?avformat + demux_jni.cc + 缂栬瘧 AAR"
         timeout-minutes: 40
         run: |
           cd "${{ env.MEDIA3_CHECKOUT }}"
@@ -267,61 +268,61 @@ jobs:
           CMAKEFILE="libraries/decoder_ffmpeg/src/main/jni/CMakeLists.txt"
           FFMPEG_JNI_DIR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main/jni"
 
-          echo "===== Patch 0: 原 CMakeLists.txt ====="
+          echo "===== Patch 0: 鍘?CMakeLists.txt ====="
           cat "${CMAKEFILE}"
 
-          # ══════════════════════════════════════════════════════════
-          # Patch 1: foreach 循环里加上 avformat
-          #   原: foreach(ffmpeg_lib avutil swresample avcodec)
-          #   改: foreach(ffmpeg_lib avformat avutil swresample avcodec)
-          # ══════════════════════════════════════════════════════════
+          # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
+          # Patch 1: foreach 寰幆閲屽姞涓?avformat
+          #   鍘? foreach(ffmpeg_lib avutil swresample avcodec)
+          #   鏀? foreach(ffmpeg_lib avformat avutil swresample avcodec)
+          # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
           sed -i 's/foreach(ffmpeg_lib avutil swresample avcodec)/foreach(ffmpeg_lib avformat avutil swresample avcodec)/' "${CMAKEFILE}"
-          grep "foreach.*avformat.*avutil" "${CMAKEFILE}" && echo "✅ Patch 1 生效" || { echo "❌ Patch 1 失败"; exit 1; }
+          grep "foreach.*avformat.*avutil" "${CMAKEFILE}" && echo "鉁?Patch 1 鐢熸晥" || { echo "鉂?Patch 1 澶辫触"; exit 1; }
 
-          # ══════════════════════════════════════════════════════════
-          # Patch 2: add_library 里加上 ffmpeg_demux_jni.cc
-          #   原: add_library(ffmpegJNI SHARED ffmpeg_jni.cc)
-          #   改: add_library(ffmpegJNI SHARED ffmpeg_jni.cc ffmpeg_demux_jni.cc)
-          # ══════════════════════════════════════════════════════════
+          # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
+          # Patch 2: add_library 閲屽姞涓?ffmpeg_demux_jni.cc
+          #   鍘? add_library(ffmpegJNI SHARED ffmpeg_jni.cc)
+          #   鏀? add_library(ffmpegJNI SHARED ffmpeg_jni.cc ffmpeg_demux_jni.cc)
+          # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
           sed -i 's/add_library(ffmpegJNI$/\n            SHARED\n            ffmpeg_jni.cc\n            ffmpeg_demux_jni.cc\n)/' "${CMAKEFILE}"
-          # 上面的 sed 可能因为格式问题没正确匹配，用更可靠的方法：
-          # 先恢复，然后用 python 处理
+          # 涓婇潰鐨?sed 鍙兘鍥犱负鏍煎紡闂娌℃纭尮閰嶏紝鐢ㄦ洿鍙潬鐨勬柟娉曪細
+          # 鍏堟仮澶嶏紝鐒跺悗鐢?python 澶勭悊
           sed -i 's/ffmpegJNI.*ffmpeg_jni.cc.*ffmpeg_demux_jni.cc.*)/add_library(ffmpegJNI/' "${CMAKEFILE}" 2>/dev/null || true
 
-          # 用 python 精确处理 (base64 编码避免 YAML heredoc 缩进问题)
+          # 鐢?python 绮剧‘澶勭悊 (base64 缂栫爜閬垮厤 YAML heredoc 缂╄繘闂)
           echo "aW1wb3J0IHJlCgpjbWFrZV9wYXRoID0gImxpYnJhcmllcy9kZWNvZGVyX2ZmbXBlZy9zcmMvbWFpbi9qbmkvQ01ha2VMaXN0cy50eHQiCndpdGggb3BlbihjbWFrZV9wYXRoLCAncicpIGFzIGY6CiAgICBjb250ZW50ID0gZi5yZWFkKCkKCiMg5oqKICJhZGRfbGlicmFyeShmZm1wZWdKTklcbiAgICAgICAgICAgIFNIQVJFRFxuICAgICAgICAgICAgZmZtcGVnX2puaS5jYykiIOaUueaIkOWKoCBmZm1wZWdfZGVtdXhfam5pLmNjCiMg5oiW6ICF5pu0566A5Y2V77ya5ZyoIGZmbXBlZ19qbmkuY2Mg6YKj6KGM5ZCO6Z2i5YqgIGZmbXBlZ19kZW11eF9qbmkuY2MKY29udGVudCA9IGNvbnRlbnQucmVwbGFjZSgKICAgICdmZm1wZWdfam5pLmNjKScsCiAgICAnZmZtcGVnX2puaS5jY1xuICAgICAgICAgICAgZmZtcGVnX2RlbXV4X2puaS5jYyknCikKCiMgUGF0Y2ggMzogdGFyZ2V0X2xpbmtfbGlicmFyaWVzIOmHjOWKoCBQUklWQVRFIGF2Zm9ybWF0CmNvbnRlbnQgPSBjb250ZW50LnJlcGxhY2UoCiAgICAnUFJJVkFURSBzd3Jlc2FtcGxlXG4gICAgICAgICAgICAgICAgICAgICAgUFJJVkFURSBhdmNvZGVjJywKICAgICdQUklWQVRFIHN3cmVzYW1wbGVcbiAgICAgICAgICAgICAgICAgICAgICBQUklWQVRFIGF2Y29kZWNcbiAgICAgICAgICAgICAgICAgICAgICBQUklWQVRFIGF2Zm9ybWF0JwopCgojIFBhdGNoIDQ6IOWKoOWFpSBhdmZvcm1hdCDnmoQgaW5jbHVkZSDnm67lvZXvvIjmnInml7bpnIDopoHvvIkKIyDlhbblrp4gaW5jbHVkZV9kaXJlY3RvcmllcyhcKSDlt7Lnu4/ljIXlkKvkuoYgZmZtcGVnIOagueebruW9lQojIGF2Zm9ybWF0IOWktOaWh+S7tuWcqCBmZm1wZWcvbGliYXZmb3JtYXQvIOS4i++8jEZGbXBlZyDlronoo4XlkI7lpLTmlofku7blupTor6XlnKggZmZtcGVnL2FuZHJvaWQtbGlicy88YWJpPi9pbmNsdWRlLwojIOS9huaIkeS7rOeUqOeahOaYr+ebtOaOpea6kOeggei3r+W+hO+8jOaJgOS7pSBsaWJhdmZvcm1hdC8g5a2Q55uu5b2V5ZyoIEZGbXBlZyDmupDnoIHmoJHph4zmnKzmnaXlsLHmnIkKIyDkuI3pnIDopoHpop3lpJbliqAKCndpdGggb3BlbihjbWFrZV9wYXRoLCAndycpIGFzIGY6CiAgICBmLndyaXRlKGNvbnRlbnQpCgpwcmludCgi4pyFIFB5dGhvbiBwYXRjaCDlrozmiJAiKQ==" | base64 -d | python3
 
           echo ""
-          echo "===== Patch 后 CMakeLists.txt ====="
+          echo "===== Patch 鍚?CMakeLists.txt ====="
           cat "${CMAKEFILE}"
           echo ""
-          echo "===== 验证关键 patch ====="
-          grep "avformat avutil" "${CMAKEFILE}" && echo "✅ avformat 加入 foreach" || echo "❌ avformat foreach patch 失败"
-          grep "ffmpeg_demux_jni.cc" "${CMAKEFILE}" && echo "✅ ffmpeg_demux_jni.cc 加入 add_library" || echo "❌ demux_jni.cc patch 失败"
-          grep "PRIVATE avformat" "${CMAKEFILE}" && echo "✅ avformat 加入 target_link_libraries" || echo "❌ avformat link patch 失败"
+          echo "===== 楠岃瘉鍏抽敭 patch ====="
+          grep "avformat avutil" "${CMAKEFILE}" && echo "鉁?avformat 鍔犲叆 foreach" || echo "鉂?avformat foreach patch 澶辫触"
+          grep "ffmpeg_demux_jni.cc" "${CMAKEFILE}" && echo "鉁?ffmpeg_demux_jni.cc 鍔犲叆 add_library" || echo "鉂?demux_jni.cc patch 澶辫触"
+          grep "PRIVATE avformat" "${CMAKEFILE}" && echo "鉁?avformat 鍔犲叆 target_link_libraries" || echo "鉂?avformat link patch 澶辫触"
 
-          # ══════════════════════════════════════════════════════════
-          # 强校验: libavformat.a 必须存在于每个 ABI 目录
-          # ══════════════════════════════════════════════════════════
+          # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
+          # 寮烘牎楠? libavformat.a 蹇呴』瀛樺湪浜庢瘡涓?ABI 鐩綍
+          # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
           echo ""
-          echo "===== 强校验: libavformat.a ====="
+          echo "===== 寮烘牎楠? libavformat.a ====="
           for abi in armeabi-v7a arm64-v8a x86 x86_64; do
             LIBAV="${FFMPEG_JNI_DIR}/ffmpeg/android-libs/$abi/libavformat.a"
             if test -f "$LIBAV"; then
-              echo "✅ $abi: libavformat.a 存在 ($(du -h $LIBAV | cut -f1))"
+              echo "鉁?$abi: libavformat.a 瀛樺湪 ($(du -h $LIBAV | cut -f1))"
             else
-              echo "❌ $abi: libavformat.a 缺失! 无法链接"
+              echo "鉂?$abi: libavformat.a 缂哄け! 鏃犳硶閾炬帴"
               ls -la "${FFMPEG_JNI_DIR}/ffmpeg/android-libs/$abi/" 2>&1
-              # 打印 FFmpeg configure 是否启用了 avformat
-              echo "--- 检查 FFmpeg 编译配置 ---"
-              cat "${FFMPEG_JNI_DIR}/ffmpeg/android-libs/$abi/config.log" 2>/dev/null | grep -i avformat | head -n 5 || echo "(无 config.log)"
+              # 鎵撳嵃 FFmpeg configure 鏄惁鍚敤浜?avformat
+              echo "--- 妫€鏌?FFmpeg 缂栬瘧閰嶇疆 ---"
+              cat "${FFMPEG_JNI_DIR}/ffmpeg/android-libs/$abi/config.log" 2>/dev/null | grep -i avformat | head -n 5 || echo "(鏃?config.log)"
               exit 2
             fi
           done
 
-          # ══════════════════════════════════════════════════════════
-          # 写 local.properties + Gradle 编译
-          # ══════════════════════════════════════════════════════════
+          # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
+          # 鍐?local.properties + Gradle 缂栬瘧
+          # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
           SDK_ROOT="${{ env.ANDROID_HOME }}"
           NDK_DIR="${{ env.ANDROID_NDK_ROOT }}"
           CMAKE_DIR="${SDK_ROOT}/cmake/3.22.1"
@@ -336,17 +337,17 @@ jobs:
           export PATH="${CMAKE_DIR}/bin:${NDK_DIR}:${SDK_ROOT}/cmdline-tools/latest/bin:${SDK_ROOT}/build-tools/34.0.0:${SDK_ROOT}/platform-tools:${PATH}"
 
           TARGET_PROJECT=":lib-decoder-ffmpeg"
-          echo "目标模块: $TARGET_PROJECT"
+          echo "鐩爣妯″潡: $TARGET_PROJECT"
 
-          echo "===== dry-run 验证 ====="
+          echo "===== dry-run 楠岃瘉 ====="
           ./gradlew "${TARGET_PROJECT}:assembleRelease" --dry-run --no-daemon 2>&1 | tail -n 10
 
-          echo "===== 正式编译 assembleRelease ====="
+          echo "===== 姝ｅ紡缂栬瘧 assembleRelease ====="
           ./gradlew "${TARGET_PROJECT}:assembleRelease" \
             --no-daemon --stacktrace --no-build-cache --no-configuration-cache \
             -PdisablePreDex -Pandroid.builder.sdkDownload=false
 
-          # 找 AAR
+          # 鎵?AAR
           EXPECTED_AAR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/build/outputs/aar/lib-decoder-ffmpeg-release.aar"
           if [ -f "$EXPECTED_AAR" ]; then
             AAR="$EXPECTED_AAR"
@@ -354,18 +355,18 @@ jobs:
             AAR=$(find "${{ env.MEDIA3_CHECKOUT }}" -name "*.aar" -path "*release*" -print 2>/dev/null | head -n1)
           fi
           echo ""
-          echo "===== AAR 找到 ====="
+          echo "===== AAR 鎵惧埌 ====="
           echo "AAR=$AAR"
           ls -lh "$AAR"
 
-          # 验证 AAR 内容
+          # 楠岃瘉 AAR 鍐呭
           echo ""
-          echo "===== AAR 内部结构 ====="
+          echo "===== AAR 鍐呴儴缁撴瀯 ====="
           unzip -l "${AAR}" | head -n 40
 
-          # 关键验证：.so 是否包含 avformat 符号
+          # 鍏抽敭楠岃瘉锛?so 鏄惁鍖呭惈 avformat 绗﹀彿
           echo ""
-          echo "===== 强校验: .so 必须链接 avformat 符号 ====="
+          echo "===== 寮烘牎楠? .so 蹇呴』閾炬帴 avformat 绗﹀彿 ====="
           TMPDIR=$(mktemp -d)
           cd "$TMPDIR"
           unzip -q "${AAR}" "jni/*/libffmpegJNI.so" 2>/dev/null
@@ -373,28 +374,28 @@ jobs:
             SO="jni/$abi/libffmpegJNI.so"
             if [ -f "$SO" ]; then
               echo "--- $abi ---"
-              echo "  大小: $(ls -lh $SO | cut -f5)"
-              # 用 ndk 的 llvm-nm 检查 avformat 符号
+              echo "  澶у皬: $(ls -lh $SO | cut -f5)"
+              # 鐢?ndk 鐨?llvm-nm 妫€鏌?avformat 绗﹀彿
               NM="${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
               if [ -f "$NM" ]; then
                 AVFMT_SYMS=$("$NM" "$SO" 2>/dev/null | grep -c "avformat_" || true)
-                echo "  avformat_ 符号数: $AVFMT_SYMS"
+                echo "  avformat_ 绗﹀彿鏁? $AVFMT_SYMS"
                 if [ "$AVFMT_SYMS" -gt 0 ]; then
-                  echo "  ✅ avformat 已链接!"
+                  echo "  鉁?avformat 宸查摼鎺?"
                 else
-                  echo "  ❌ avformat 未链接!"
+                  echo "  鉂?avformat 鏈摼鎺?"
                 fi
-                # 检查我们的 demux JNI 函数
+                # 妫€鏌ユ垜浠殑 demux JNI 鍑芥暟
                 DEMUX_SYMS=$("$NM" "$SO" 2>/dev/null | grep -c "Java_com_wmplay_extractor_FfmpegExtractor" || true)
-                echo "  demux JNI 符号数: $DEMUX_SYMS"
+                echo "  demux JNI 绗﹀彿鏁? $DEMUX_SYMS"
                 if [ "$DEMUX_SYMS" -gt 0 ]; then
-                  echo "  ✅ demux JNI 函数已导出!"
+                  echo "  鉁?demux JNI 鍑芥暟宸插鍑?"
                 else
-                  echo "  ❌ demux JNI 函数未导出!"
+                  echo "  鉂?demux JNI 鍑芥暟鏈鍑?"
                 fi
               fi
             else
-              echo "❌ $abi/libffmpegJNI.so 不存在!"
+              echo "鉂?$abi/libffmpegJNI.so 涓嶅瓨鍦?"
             fi
           done
           cd /
@@ -402,8 +403,8 @@ jobs:
 
           echo "FINAL_AAR_PATH=$AAR" >> "$GITHUB_ENV"
 
-      # ===================== 7. 上传 AAR 到 Artifacts =====================
-      - name: "[上传] 上传 AAR 到 Actions Artifacts"
+      # ===================== 7. 涓婁紶 AAR 鍒?Artifacts =====================
+      - name: "[涓婁紶] 涓婁紶 AAR 鍒?Actions Artifacts"
         uses: actions/upload-artifact@v4
         with:
           name: "decoder_ffmpeg_with_demux-media3-1.5.1"
@@ -412,46 +413,46 @@ jobs:
           retention-days: 90
           if-no-files-found: error
 
-      # ===================== 8. 发布到 Release =====================
-      - name: "[发布] 上传 AAR 到 GitHub Release"
+      # ===================== 8. 鍙戝竷鍒?Release =====================
+      - name: "[鍙戝竷] 涓婁紶 AAR 鍒?GitHub Release"
         uses: softprops/action-gh-release@v2
         if: success()
         with:
           tag_name: "media3-1.5.1-ffmpeg-demux-v1"
           name: "Media3 1.5.1 FFmpeg Extension WITH Container Demuxer (WMA+APE+AIFF)"
           body: |
-            🎉 **v1 with avformat demuxer** - 首次包含容器解复用功能的构建!
+            馃帀 **v1 with avformat demuxer** - 棣栨鍖呭惈瀹瑰櫒瑙ｅ鐢ㄥ姛鑳界殑鏋勫缓!
 
-            相比旧版的关键变化:
-            - ✅ **移除了 `--disable-avformat`**: FFmpeg 现在会编译 libavformat.a
-            - ✅ **启用了 demuxer**: asf (WMA), aiff (AIFF), ape (Monkey's Audio), wav, mp3, flac, ogg, mkv, mov, mp4, avi
-            - ✅ **启用了 parser**: wmav1/wmav2/ape/aac/mp3/flac/opus/vorbis/alac/ac3/eac3
-            - ✅ **启用了 protocol**: file, pipe
-            - ✅ **新增 ffmpeg_demux_jni.cc**: 10 个 avformat demux JNI 函数
+            鐩告瘮鏃х増鐨勫叧閿彉鍖?
+            - 鉁?**绉婚櫎浜?`--disable-avformat`**: FFmpeg 鐜板湪浼氱紪璇?libavformat.a
+            - 鉁?**鍚敤浜?demuxer**: asf (WMA), aiff (AIFF), ape (Monkey's Audio), wav, mp3, flac, ogg, mkv, mov, mp4, avi
+            - 鉁?**鍚敤浜?parser**: wmav1/wmav2/ape/aac/mp3/flac/opus/vorbis/alac/ac3/eac3
+            - 鉁?**鍚敤浜?protocol**: file, pipe
+            - 鉁?**鏂板 ffmpeg_demux_jni.cc**: 10 涓?avformat demux JNI 鍑芥暟
 
-            Kotlin 侧需要搭配:
-            - `FfmpegExtractor.kt` (我们写的 Extractor 实现)
-            - `ExtendedExtractorsFactory.kt` (包装 DefaultExtractorsFactory)
-            - `PlaybackService.kt` 里加 `.setExtractorsFactory(ExtendedExtractorsFactory())`
+            Kotlin 渚ч渶瑕佹惌閰?
+            - `FfmpegExtractor.kt` (鎴戜滑鍐欑殑 Extractor 瀹炵幇)
+            - `ExtendedExtractorsFactory.kt` (鍖呰 DefaultExtractorsFactory)
+            - `PlaybackService.kt` 閲屽姞 `.setExtractorsFactory(ExtendedExtractorsFactory())`
 
-            编译配置:
-            - Media3 版本：1.5.1
-            - Android NDK ：r25b
-            - ANDROID_ABI：21
-            - 包含 ABI：armeabi-v7a, arm64-v8a, x86, x86_64
-            - FFmpeg 版本：6.0
-            - 解码器：WMA(wmav1/wmav2/wmapro/wmalossless), APE, AIFF PCM, mp3, flac, vorbis, opus, alac, aac, ac3, eac3
+            缂栬瘧閰嶇疆:
+            - Media3 鐗堟湰锛?.5.1
+            - Android NDK 锛歳25b
+            - ANDROID_ABI锛?1
+            - 鍖呭惈 ABI锛歛rmeabi-v7a, arm64-v8a, x86, x86_64
+            - FFmpeg 鐗堟湰锛?.0
+            - 瑙ｇ爜鍣細WMA(wmav1/wmav2/wmapro/wmalossless), APE, AIFF PCM, mp3, flac, vorbis, opus, alac, aac, ac3, eac3
 
-            使用方法：
-            1. 下载 decoder_ffmpeg-release.aar
-            2. 复制到 Android 项目的 app/libs/ 目录（替换旧版）
-            3. build.gradle.kts 添加:
+            浣跨敤鏂规硶锛?
+            1. 涓嬭浇 decoder_ffmpeg-release.aar
+            2. 澶嶅埗鍒?Android 椤圭洰鐨?app/libs/ 鐩綍锛堟浛鎹㈡棫鐗堬級
+            3. build.gradle.kts 娣诲姞:
                ```kotlin
                dependencies {
                    implementation(files("libs/decoder_ffmpeg-release.aar"))
                }
                ```
-            4. 确保 Kotlin Extractor 层已就位
+            4. 纭繚 Kotlin Extractor 灞傚凡灏变綅
           files: |
             ${{ env.FINAL_AAR_PATH }}
         env:
