@@ -58,13 +58,13 @@ jobs:
       # ===================== 0. 纾佺洏鐦﹁韩 =====================
       - name: "[纾佺洏] 鐦﹁韩锛氬垹闄ゆ棤鐢ㄩ瑁呰蒋浠讹紝鑵惧嚭鍙敤绌洪棿"
         run: |
-          echo "--- 鐦﹁韩鍓嶇鐩?---"
+          echo "=== Disk space before cleanup ==="
           df -h /
           sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d/dotnet* 2>/dev/null || true
           sudo rm -rf /opt/ghc /usr/local/share/boost /opt/mssql-tools /opt/hostedtoolcache/go /opt/hostedtoolcache/node /opt/hostedtoolcache/Python /opt/hostedtoolcache/Ruby /opt/hostedtoolcache/CodeQL 2>/dev/null || true
           sudo apt-get clean -y && sudo apt-get autoremove -y 2>/dev/null || true
           sudo rm -rf /tmp/* /tmp/.??* 2>/dev/null || true
-          echo "--- 鐦﹁韩鍚庣鐩?---"
+          echo "=== Disk space after cleanup ==="
           df -h /
 
       # ===================== 1. 鐜鍑嗗 =====================
@@ -95,7 +95,7 @@ jobs:
             -O ndk.zip
           unzip -q ndk.zip -d /opt
           NDK_DIR="/opt/android-ndk-${{ env.ANDROID_NDK_VERSION }}"
-          echo "NDK 瑙ｅ帇鍒? $NDK_DIR"
+          echo "NDK extracted to $NDK_DIR"
           ls -la "$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/" | head -n 10
           echo "ANDROID_NDK_ROOT=$NDK_DIR" >> "$GITHUB_ENV"
 
@@ -141,7 +141,7 @@ jobs:
           wget -q --show-progress "https://ffmpeg.org/releases/ffmpeg-6.0.tar.xz" -O ffmpeg-6.0.tar.xz
           echo "FFmpeg tar size: $(du -h ffmpeg-6.0.tar.xz | cut -f1)"
           tar xf ffmpeg-6.0.tar.xz
-          test -f ffmpeg-6.0/configure && echo "鉁?ffmpeg-6.0/configure 瀛樺湪" || echo "鉂?瑙ｅ帇澶辫触"
+          test -f ffmpeg-6.0/configure && echo "OK: ffmpeg-6.0/configure exists" || echo "FAIL: extraction failed"
 
       - name: "[FFmpeg] 閾炬帴 FFmpeg 婧愮爜鍒?jni/ffmpeg 鐩綍"
         run: |
@@ -149,13 +149,13 @@ jobs:
           rm -rf "${FFMPEG_JNI_DIR}/ffmpeg" 2>/dev/null || true
           # 鍏堝皾璇?symlink锛屽け璐ュ啀瀹炰綋鎷疯礉
           if ln -sf /tmp/ffmpeg-6.0 "${FFMPEG_JNI_DIR}/ffmpeg" && test -f "${FFMPEG_JNI_DIR}/ffmpeg/configure"; then
-            echo "INFO: symlink 鎴愬姛"
+            echo "INFO: symlink succeeded"
           else
-            echo "WARN: symlink 澶辫触锛屾敼鐢ㄥ疄浣撴嫹璐?
+            echo "WARN: symlink failed, falling back to copy"
             rm -rf "${FFMPEG_JNI_DIR}/ffmpeg"
             cp -r /tmp/ffmpeg-6.0 "${FFMPEG_JNI_DIR}/ffmpeg"
           fi
-          test -d "${FFMPEG_JNI_DIR}/ffmpeg" && echo "鉁?jni/ffmpeg 鐩綍瀛樺湪" || echo "鉂?jni/ffmpeg 鐩綍涓嶅瓨鍦?
+          test -d "${FFMPEG_JNI_DIR}/ffmpeg" && echo "OK: jni/ffmpeg dir exists" || echo "FAIL: jni/ffmpeg dir missing"
           ls -la "${FFMPEG_JNI_DIR}/ffmpeg/configure"
 
       # ===================== 5. 猸愶笍 鍏抽敭锛歅atch build_ffmpeg.sh 鍚敤 avformat =====================
@@ -168,29 +168,29 @@ jobs:
         run: |
           FFMPEG_JNI_DIR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main/jni"
           PATCHED_SH="${FFMPEG_JNI_DIR}/build_ffmpeg.sh"
-          echo "==== Patch 鍓嶇殑 COMMON_OPTIONS 閮ㄥ垎 ===="
+          echo "==== COMMON_OPTIONS before patch ===="
           grep -A 25 "COMMON_OPTIONS=" "${PATCHED_SH}" | head -n 30
 
           # Step 1: 绉婚櫎 --disable-avformat锛堝叧閿紒娌℃湁杩欒灏变笉浼氱紪 libavformat锛?
           sed -i 's/--disable-avformat//g' "${PATCHED_SH}"
-          echo "---- sed 鍚庢鏌?----"
-          grep "avformat" "${PATCHED_SH}" || echo "鉁?--disable-avformat 宸插垹闄?
+          echo "---- sed check ----"
+          grep "avformat" "${PATCHED_SH}" || echo "OK: --disable-avformat removed"
 
           # Step 2: 鍦?COMMON_OPTIONS 鏈熬锛?-disable-vulkan 鍚庨潰锛夎拷鍔犳垜浠殑 enable 閫夐」
           # 鍥犱负 COMMON_OPTIONS 鏄弻寮曞彿澶氳瀛楃涓诧紝鎴戜滑鐢?sed 鍦?--enable-swresample 鍚庨潰鎻掑叆
           sed -i '/--enable-swresample$/a\    --enable-protocol=file \\\n    --enable-protocol=pipe \\' "${PATCHED_SH}"
 
           # 鐜板湪楠岃瘉淇敼
-          echo "==== Patch 鍚庣殑 COMMON_OPTIONS 閮ㄥ垎 ===="
+          echo "==== COMMON_OPTIONS after patch ===="
           grep -A 30 "COMMON_OPTIONS=" "${PATCHED_SH}" | head -n 40
 
           # 楠岃瘉 avformat 涓嶅啀琚鐢?
-          grep -q "disable-avformat" "${PATCHED_SH}" && { echo "鉂?ERROR: --disable-avformat 浠嶅瓨鍦?"; exit 1; } \
-            || echo "鉁?--disable-avformat 宸茬Щ闄?
+          grep -q "disable-avformat" "${PATCHED_SH}" && { echo "FAIL: ERROR: --disable-avformat still present"; exit 1; } \
+            || echo "OK: --disable-avformat removed"
 
           # 楠岃瘉 enable-protocol 宸叉坊鍔?
-          grep -q "enable-protocol=file" "${PATCHED_SH}" && echo "鉁?--enable-protocol=file 宸叉坊鍔? \
-            || echo "鈿狅笍 enable-protocol 鍙兘娌″姞鎴愬姛锛堥潪鑷村懡锛屽悗闈㈡垜浠細鍦?ENABLED_FLAGS 閲屽己鍒跺姞锛?
+          grep -q "enable-protocol=file" "${PATCHED_SH}" && echo "OK: --enable-protocol=file added" \
+            || echo "WARN: enable-protocol may not have been added (non-fatal, will force-add later)"
 
       # ===================== 5b. 猸愶笍 寮哄埗杩藉姞 demuxer/parser/bsf 鍒?build_ffmpeg.sh =====================
       # 鍥犱负 build_ffmpeg.sh 鐨?COMMON_OPTIONS 涓嶆敮鎸?demuxer/parser 鍙傛暟
@@ -208,14 +208,14 @@ jobs:
           # 鐢?sed 鍦?--enable-swresample 琛屽悗闈㈣拷鍔?EXTRA_FLAGS
           sed -i "/--enable-swresample/a\\    ${EXTRA_FLAGS}" "${PATCHED_SH}"
 
-          echo "==== Patch 鍚庣殑 COMMON_OPTIONS 閮ㄥ垎 ===="
+          echo "==== COMMON_OPTIONS after patch ===="
           grep -A 2 "enable-swresample" "${PATCHED_SH}" | head -n 5
 
           echo ""
-          echo "==== 楠岃瘉鍏抽敭 patch ===="
-          grep "disable-avformat" "${PATCHED_SH}" && echo "  鉂?--disable-avformat 浠嶅瓨鍦?" || echo "  鉁?--disable-avformat 宸茬Щ闄?
-          grep "enable-avformat" "${PATCHED_SH}" && echo "  鉁?--enable-avformat 宸叉坊鍔? || echo "  鉂?鏈壘鍒?
-          grep "enable-demuxer=asf" "${PATCHED_SH}" && echo "  鉁?--enable-demuxer=asf 宸叉坊鍔? || echo "  鉂?鏈壘鍒?
+          echo "==== Verify key patches ===="
+          grep "disable-avformat" "${PATCHED_SH}" && echo "  OK: --disable-avformat removed" || echo "  FAIL: not found"
+          grep "enable-avformat" "${PATCHED_SH}" && echo "  OK: --enable-avformat added" || echo "  FAIL: not found"
+          grep "enable-demuxer=asf" "${PATCHED_SH}" && echo "  OK: --enable-demuxer=asf added" || echo "  FAIL: not found"
 
       # ===================== 5c. 猸愶笍 杩愯淇敼鍚庣殑 build_ffmpeg.sh 缂栬瘧 FFmpeg =====================
       - name: "[FFmpeg 缂栬瘧] 鏋勫缓鍏ㄩ儴 4 濂?ABI 鐨?FFmpeg 闈欐€佸簱 (鍚?libavformat.a)"
@@ -224,7 +224,7 @@ jobs:
           FFMPEG_MODULE_PATH="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main"
           BUILD_SH="${FFMPEG_MODULE_PATH}/jni/build_ffmpeg.sh"
           cd "${FFMPEG_MODULE_PATH}/jni"
-          echo "===== 杩愯淇敼鍚庣殑 build_ffmpeg.sh ====="
+          echo "===== Running patched build_ffmpeg.sh ====="
           bash "${BUILD_SH}" \
             "${FFMPEG_MODULE_PATH}" \
             "${{ env.ANDROID_NDK_ROOT }}" \
@@ -233,15 +233,15 @@ jobs:
             ${{ env.ENABLED_DECODERS }}
 
           echo ""
-          echo "===== 楠岃瘉缂栬瘧浜х墿 (姣忎釜 ABI 蹇呴』鏈?libavformat.a!) ====="
+          echo "===== Verify build artifacts (each ABI must have libavformat.a!) ====="
           for abi in armeabi-v7a arm64-v8a x86 x86_64; do
             echo "--- $abi ---"
             for lib in libavcodec.a libavformat.a libavutil.a libswresample.a; do
               f="ffmpeg/android-libs/$abi/$lib"
               if [ -f "$f" ]; then
-                echo "  鉁?$lib ($(du -h $f | cut -f1))"
+                echo "  OK: $lib ($(du -h $f | cut -f1))"
               else
-                echo "  鉂?$lib 缂哄け!"
+                echo "  FAIL: $lib missing!"
               fi
             done
             ls -la "ffmpeg/android-libs/$abi/" | head -n 10
@@ -257,7 +257,7 @@ jobs:
         run: |
           DEMUX_JNI="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main/jni/ffmpeg_demux_jni.cc"
           echo "dHJhY3Rvcl9GZm1wZWdFeHRyYWN0b3JfbmF0aXZlR2V0Q29kZWNNaW1lVHlwZSgKICAgIEpOSUVudiAqZW52LCBqb2JqZWN0IC8qdGhpeiovLCBqbG9uZyBjdHhQdHIsIGppbnQgc3RyZWFtSW5kZXgpIHsKCiAgICBEZW11eFNlc3Npb24gKnNlc3Npb24gPSAoRGVtdXhTZXNzaW9uICopY3R4UHRyOwogICAgaWYgKCFzZXNzaW9uIHx8ICFzZXNzaW9uLT5mbXRDdHgpIHJldHVybiBlbnYtPk5ld1N0cmluZ1VURigiIik7CiAgICBpZiAoc3RyZWFtSW5kZXggPCAwIHx8IHN0cmVhbUluZGV4ID49IChqaW50KXNlc3Npb24tPmZtdEN0eC0+bmJfc3RyZWFtcykgcmV0dXJuIGVudi0+TmV3U3RyaW5nVVRGKCIiKTsKCiAgICBBVkNvZGVjUGFyYW1ldGVycyAqcGFyYW1zID0gc2Vzc2lvbi0+Zm10Q3R4LT5zdHJlYW1zW3N0cmVhbUluZGV4XS0+Y29kZWNwYXI7CiAgICBjb25zdCBjaGFyICptaW1lID0gY29kZWNfdG9fbWltZShwYXJhbXMtPmNvZGVjX2lkKTsKICAgIHJldHVybiBlbnYtPk5ld1N0cmluZ1VURihtaW1lKTsKfQoKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCi8vIDUuIG5hdGl2ZUdldFNhbXBsZVJhdGUgLSDov5Tlm57ph4fmoLfnjocKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCmV4dGVybiAiQyIgSk5JRVhQT1JUIGppbnQgSk5JQ0FMTApKYXZhX2NvbV93bXBsYXlfZXh0cmFjdG9yX0ZmbXBlZ0V4dHJhY3Rvcl9uYXRpdmVHZXRTYW1wbGVSYXRlKAogICAgSk5JRW52ICplbnYsIGpvYmplY3QgLyp0aGl6Ki8sIGpsb25nIGN0eFB0ciwgamludCBzdHJlYW1JbmRleCkgewoKICAgIERlbXV4U2Vzc2lvbiAqc2Vzc2lvbiA9IChEZW11eFNlc3Npb24gKiljdHhQdHI7CiAgICBpZiAoIXNlc3Npb24gfHwgIXNlc3Npb24tPmZtdEN0eCkgcmV0dXJuIDQ0MTAwOwogICAgaWYgKHN0cmVhbUluZGV4IDwgMCB8fCBzdHJlYW1JbmRleCA+PSAoamludClzZXNzaW9uLT5mbXRDdHgtPm5iX3N0cmVhbXMpIHJldHVybiA0NDEwMDsKCiAgICBBVkNvZGVjUGFyYW1ldGVycyAqcGFyYW1zID0gc2Vzc2lvbi0+Zm10Q3R4LT5zdHJlYW1zW3N0cmVhbUluZGV4XS0+Y29kZWNwYXI7CiAgICByZXR1cm4gcGFyYW1zLT5zYW1wbGVfcmF0ZSA+IDAgPyBwYXJhbXMtPnNhbXBsZV9yYXRlIDogNDQxMDA7Cn0KCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAovLyA2LiBuYXRpdmVHZXRDaGFubmVsQ291bnQgLSDov5Tlm57lo7DpgZPmlbAKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCmV4dGVybiAiQyIgSk5JRVhQT1JUIGppbnQgSk5JQ0FMTApKYXZhX2NvbV93bXBsYXlfZXh0cmFjdG9yX0ZmbXBlZ0V4dHJhY3Rvcl9uYXRpdmVHZXRDaGFubmVsQ291bnQoCiAgICBKTklFbnYgKmVudiwgam9iamVjdCAvKnRoaXoqLywgamxvbmcgY3R4UHRyLCBqaW50IHN0cmVhbUluZGV4KSB7CgogICAgRGVtdXhTZXNzaW9uICpzZXNzaW9uID0gKERlbXV4U2Vzc2lvbiAqKWN0eFB0cjsKICAgIGlmICghc2Vzc2lvbiB8fCAhc2Vzc2lvbi0+Zm10Q3R4KSByZXR1cm4gMjsKICAgIGlmIChzdHJlYW1JbmRleCA8IDAgfHwgc3RyZWFtSW5kZXggPj0gKGppbnQpc2Vzc2lvbi0+Zm10Q3R4LT5uYl9zdHJlYW1zKSByZXR1cm4gMjsKCiAgICBBVkNvZGVjUGFyYW1ldGVycyAqcGFyYW1zID0gc2Vzc2lvbi0+Zm10Q3R4LT5zdHJlYW1zW3N0cmVhbUluZGV4XS0+Y29kZWNwYXI7CiAgICBpbnQgY2ggPSBwYXJhbXMtPmNoX2xheW91dC5uYl9jaGFubmVsczsKICAgIHJldHVybiBjaCA+IDAgPyBjaCA6IChwYXJhbXMtPmNoYW5uZWxfbGF5b3V0ID8gMiA6IDIpOwp9CgovLyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKLy8gNy4gbmF0aXZlUmVhZFBhY2tldCAtIOivu+WPluS4i+S4gOW4p+mfs+mikeaVsOaNruWMhQovLyDov5Tlm57lgLw6ID4wID0g5a2X6IqC5pWwLCAwID0gRU9GLCA8MCA9IOmUmeivrwovLyDmlbDmja7lhpnlhaXkvKDlhaXnmoQgSmF2YSBieXRlIGFycmF5Ci8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkApleHRlcm4gIkMiIEpOSUVYUE9SVCBqaW50IEpOSUNBTEwKSmF2YV9jb21fd21wbGF5X2V4dHJhY3Rvcl9GZm1wZWdFeHRyYWN0b3JfbmF0aXZlUmVhZFBhY2tldCgKICAgIEpOSUVudiAqZW52LCBqb2JqZWN0IC8qdGhpeiovLCBqbG9uZyBjdHhQdHIsIGpieXRlQXJyYXkgYnVmZmVyKSB7CgogICAgRGVtdXhTZXNzaW9uICpzZXNzaW9uID0gKERlbXV4U2Vzc2lvbiAqKWN0eFB0cjsKICAgIGlmICghc2Vzc2lvbiB8fCAhc2Vzc2lvbi0+Zm10Q3R4KSByZXR1cm4gLTE7CiAgICBpZiAoIWJ1ZmZlcikgcmV0dXJuIC0xOwoKICAgIC8vIOWmguaenOS4iuS4gOS4qiBwYWNrZXQg6L+Y5pyJ5pyq6K+755qE5pWw5o2u77yM5YWI5aSE55CG5o6J77yI5L2G5oiR5Lus5q+P5qyh6K+75a6M5pW0IHBhY2tldO+8jOaJgOS7peS4jeWtmOWcqO+8iQogICAgLy8g6YeK5pS+5LiK5LiA5LiqIHBhY2tldAogICAgaWYgKHNlc3Npb24tPmN1cnJlbnRQYWNrZXQgJiYgc2Vzc2lvbi0+aGFzUGFja2V0KSB7CiAgICAgICAgYXZfcGFja2V0X3VucmVmKHNlc3Npb24tPmN1cnJlbnRQYWNrZXQpOwogICAgICAgIHNlc3Npb24tPmhhc1BhY2tldCA9IGZhbHNlOwogICAgfQoKICAgIC8vIOW+queOr+ivu+ebtOWIsOaJvuWIsOmfs+mikea1geeahCBwYWNrZXQKICAgIGludCByZXQ7CiAgICB3aGlsZSAoKHJldCA9IGF2X3JlYWRfZnJhbWUoc2Vzc2lvbi0+Zm10Q3R4LCBzZXNzaW9uLT5jdXJyZW50UGFja2V0KSkgPj0gMCkgewogICAgICAgIGlmIChzZXNzaW9uLT5jdXJyZW50UGFja2V0LT5zdHJlYW1faW5kZXggPT0gc2Vzc2lvbi0+YXVkaW9TdHJlYW1JbmRleCkgewogICAgICAgICAgICAvLyDmib7liLDkuobpn7PpopEgcGFja2V0CiAgICAgICAgICAgIHNlc3Npb24tPmhhc1BhY2tldCA9IHRydWU7CiAgICAgICAgICAgIGJyZWFrOwogICAgICAgIH0KICAgICAgICAvLyDkuI3mmK/pn7PpopHmtYHvvIzot7Pov4cKICAgICAgICBhdl9wYWNrZXRfdW5yZWYoc2Vzc2lvbi0+Y3VycmVudFBhY2tldCk7CiAgICB9CgogICAgaWYgKHJldCA8IDApIHsKICAgICAgICAvLyBFT0Yg5oiW6ZSZ6K+vCiAgICAgICAgaWYgKHJldCA9PSBBVkVSUk9SX0VPRikgewogICAgICAgICAgICBMT0dEKCJuYXRpdmVSZWFkUGFja2V0OiBFT0YgcmVhY2hlZCIpOwogICAgICAgIH0gZWxzZSB7CiAgICAgICAgICAgIExPR1coIm5hdGl2ZVJlYWRQYWNrZXQgZXJyb3I6ICVkIiwgcmV0KTsKICAgICAgICB9CiAgICAgICAgcmV0dXJuIDA7ICAvLyAwIOihqOekuiBFT0YKICAgIH0KCiAgICAvLyDmioogcGFja2V0IOaVsOaNruaLt+WIsCBKYXZhIGJ1ZmZlcgogICAganNpemUgYnVmTGVuID0gZW52LT5HZXRBcnJheUxlbmd0aChidWZmZXIpOwogICAgaW50IHBhY2tldFNpemUgPSBzZXNzaW9uLT5jdXJyZW50UGFja2V0LT5zaXplOwogICAgaW50IGNvcHlTaXplID0gKHBhY2tldFNpemUgPCAoaW50KWJ1ZkxlbikgPyBwYWNrZXRTaXplIDogKGludClidWZMZW47CgogICAgZW52LT5TZXRCeXRlQXJyYXlSZWdpb24oYnVmZmVyLCAwLCBjb3B5U2l6ZSwgKGpieXRlICopc2Vzc2lvbi0+Y3VycmVudFBhY2tldC0+ZGF0YSk7CgogICAgLy8g6K6w5b2VIFBUUyAo6L2s5oiQ5b6u56eSKQogICAgaWYgKHNlc3Npb24tPmN1cnJlbnRQYWNrZXQtPnB0cyAhPSBBVl9OT1BUU19WQUxVRSAmJiBzZXNzaW9uLT5hdWRpb1N0cmVhbUluZGV4ID49IDApIHsKICAgICAgICBBVlN0cmVhbSAqc3RyZWFtID0gc2Vzc2lvbi0+Zm10Q3R4LT5zdHJlYW1zW3Nlc3Npb24tPmF1ZGlvU3RyZWFtSW5kZXhdOwogICAgICAgIHNlc3Npb24tPmxhc3RQdHNVcyA9IHB0c190b191cyhzZXNzaW9uLT5jdXJyZW50UGFja2V0LT5wdHMsIHN0cmVhbS0+dGltZV9iYXNlKTsKICAgIH0gZWxzZSB7CiAgICAgICAgc2Vzc2lvbi0+bGFzdFB0c1VzID0gMDsKICAgIH0KCiAgICByZXR1cm4gY29weVNpemU7Cn0KCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAovLyA4LiBuYXRpdmVHZXRQYWNrZXRQdHNVcyAtIOiOt+WPluS4iuS4gOS4qiBwYWNrZXQg55qEIFBUUyAo5b6u56eSKQovLyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKZXh0ZXJuICJDIiBKTklFWFBPUlQgamxvbmcgSk5JQ0FMTApKYXZhX2NvbV93bXBsYXlfZXh0cmFjdG9yX0ZmbXBlZ0V4dHJhY3Rvcl9uYXRpdmVHZXRQYWNrZXRQdHNVcygKICAgIEpOSUVudiAqZW52LCBqb2JqZWN0IC8qdGhpeiovLCBqbG9uZyBjdHhQdHIpIHsKCiAgICBEZW11eFNlc3Npb24gKnNlc3Npb24gPSAoRGVtdXhTZXNzaW9uICopY3R4UHRyOwogICAgaWYgKCFzZXNzaW9uKSByZXR1cm4gMDsKICAgIHJldHVybiBzZXNzaW9uLT5sYXN0UHRzVXM7Cn0KCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAovLyA5LiBuYXRpdmVTZWVrIC0g6Lez6L2s5Yiw5oyH5a6a5pe26Ze0ICjlvq7np5IpCi8vIOi/lOWbniAwPeaIkOWKnywg6Z2e6Zu2PeWksei0pQovLyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKZXh0ZXJuICJDIiBKTklFWFBPUlQgamludCBKTklDQUxMCkphdmFfY29tX3dtcGxheV9leHRyYWN0b3JfRmZtcGVnRXh0cmFjdG9yX25hdGl2ZVNlZWsoCiAgICBKTklFbnYgKmVudiwgam9iamVjdCAvKnRoaXoqLywgamxvbmcgY3R4UHRyLCBqbG9uZyB0aW1lVXMpIHsKCiAgICBEZW11eFNlc3Npb24gKnNlc3Npb24gPSAoRGVtdXhTZXNzaW9uICopY3R4UHRyOwogICAgaWYgKCFzZXNzaW9uIHx8ICFzZXNzaW9uLT5mbXRDdHgpIHJldHVybiAtMTsKICAgIGlmIChzZXNzaW9uLT5hdWRpb1N0cmVhbUluZGV4IDwgMCkgcmV0dXJuIC0xOwoKICAgIC8vIOmHiuaUvuW9k+WJjSBwYWNrZXQKICAgIGlmIChzZXNzaW9uLT5jdXJyZW50UGFja2V0ICYmIHNlc3Npb24tPmhhc1BhY2tldCkgewogICAgICAgIGF2X3BhY2tldF91bnJlZihzZXNzaW9uLT5jdXJyZW50UGFja2V0KTsKICAgICAgICBzZXNzaW9uLT5oYXNQYWNrZXQgPSBmYWxzZTsKICAgIH0KCiAgICAvLyDlvq7np5LovazmtYHml7bpl7Tln7oKICAgIEFWU3RyZWFtICpzdHJlYW0gPSBzZXNzaW9uLT5mbXRDdHgtPnN0cmVhbXNbc2Vzc2lvbi0+YXVkaW9TdHJlYW1JbmRleF07CiAgICBpbnQ2NF90IHRzID0gYXZfcmVzY2FsZV9xKHRpbWVVcywgKEFWUmF0aW9uYWwpezEsIDEwMDAwMDB9LCBzdHJlYW0tPnRpbWVfYmFzZSk7CgogICAgTE9HRCgibmF0aXZlU2VlazogdGltZVVzPSVsbGQgLT4gdHM9JWxsZCAodGltZWJhc2U9JWQvJWQpIiwKICAgICAgICAgKGxvbmcgbG9uZyl0aW1lVXMsIChsb25nIGxvbmcpdHMsIHN0cmVhbS0+dGltZV9iYXNlLm51bSwgc3RyZWFtLT50aW1lX2Jhc2UuZGVuKTsKCiAgICBpbnQgcmV0ID0gYXZfc2Vla19mcmFtZShzZXNzaW9uLT5mbXRDdHgsIHNlc3Npb24tPmF1ZGlvU3RyZWFtSW5kZXgsIHRzLCBBVlNFRUtfRkxBR19CQUNLV0FSRCk7CiAgICBpZiAocmV0IDwgMCkgewogICAgICAgIC8vIOmZjee6p++8mueUqCBhdmZvcm1hdF9zZWVrX2ZpbGUg5oiW5Zyo5pW05Liq5pe26Ze06L205LiKIHNlZWsKICAgICAgICBBVlJhdGlvbmFsIGZtdF90YiA9IHNlc3Npb24tPmZtdEN0eC0+aWZvcm1hdC0+ZmxhZ3MgJiBBVkZNVF9OT0JJTlNFQVJDSAogICAgICAgICAgICA/IHNlc3Npb24tPmZtdEN0eC0+c3RyZWFtc1swXS0+dGltZV9iYXNlCiAgICAgICAgICAgIDogKEFWUmF0aW9uYWwpezEsIEFWX1RJTUVfQkFTRX07CiAgICAgICAgaW50NjRfdCB0czIgPSBhdl9yZXNjYWxlX3EodGltZVVzLCAoQVZSYXRpb25hbCl7MSwgMTAwMDAwMH0sIGZtdF90Yik7CiAgICAgICAgcmV0ID0gYXZfc2Vla19mcmFtZShzZXNzaW9uLT5mbXRDdHgsIC0xLCB0czIsIEFWU0VFS19GTEFHX0JBQ0tXQVJEKTsKICAgICAgICBpZiAocmV0IDwgMCkgewogICAgICAgICAgICBsb2dfYXZfZXJyb3IoImF2X3NlZWtfZnJhbWUiLCByZXQpOwogICAgICAgICAgICByZXR1cm4gcmV0OwogICAgICAgIH0KICAgIH0KCiAgICAvLyDliLfmlrDop6PnoIHlmagKICAgIGF2Zm9ybWF0X2ZsdXNoKHNlc3Npb24tPmZtdEN0eCk7CiAgICBzZXNzaW9uLT5sYXN0UHRzVXMgPSB0aW1lVXM7CiAgICByZXR1cm4gMDsKfQoKLy8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCi8vIDEwLiBuYXRpdmVDbG9zZUlucHV0IC0g5YWz6Zet5bm26YeK5pS+5omA5pyJ6LWE5rqQCi8vIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkApleHRlcm4gIkMiIEpOSUVYUE9SVCB2b2lkIEpOSUNBTEwKSmF2YV9jb21fd21wbGF5X2V4dHJhY3Rvcl9GZm1wZWdFeHRyYWN0b3JfbmF0aXZlQ2xvc2VJbnB1dCgKICAgIEpOSUVudiAqZW52LCBqb2JqZWN0IC8qdGhpeiovLCBqbG9uZyBjdHhQdHIpIHsKCiAgICBEZW11eFNlc3Npb24gKnNlc3Npb24gPSAoRGVtdXhTZXNzaW9uICopY3R4UHRyOwogICAgaWYgKCFzZXNzaW9uKSByZXR1cm47CgogICAgTE9HRCgibmF0aXZlQ2xvc2VJbnB1dDogY2xvc2luZyBjdHg9JXAiLCBzZXNzaW9uLT5mbXRDdHgpOwoKICAgIGlmIChzZXNzaW9uLT5jdXJyZW50UGFja2V0KSB7CiAgICAgICAgYXZfcGFja2V0X2ZyZWUoJnNlc3Npb24tPmN1cnJlbnRQYWNrZXQpOwogICAgICAgIHNlc3Npb24tPmN1cnJlbnRQYWNrZXQgPSBudWxscHRyOwogICAgfQogICAgaWYgKHNlc3Npb24tPmZtdEN0eCkgewogICAgICAgIGF2Zm9ybWF0X2Nsb3NlX2lucHV0KCZzZXNzaW9uLT5mbXRDdHgpOwogICAgICAgIHNlc3Npb24tPmZtdEN0eCA9IG51bGxwdHI7CiAgICB9CgogICAgZGVsZXRlIHNlc3Npb247CiAgICBMT0dEKCJuYXRpdmVDbG9zZUlucHV0IGRvbmUiKTsKfQo=" | base64 -d >> "${DEMUX_JNI}"
-          echo "==== ffmpeg_demux_jni.cc 鍐欏叆瀹屾垚 ===="
+          echo "==== ffmpeg_demux_jni.cc write complete ===="
           wc -l "${DEMUX_JNI}"
           head -5 "${DEMUX_JNI}"
 
@@ -271,7 +271,7 @@ jobs:
           CMAKEFILE="libraries/decoder_ffmpeg/src/main/jni/CMakeLists.txt"
           FFMPEG_JNI_DIR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/src/main/jni"
 
-          echo "===== Patch 0: 鍘?CMakeLists.txt ====="
+          echo "===== Patch 0: original CMakeLists.txt ====="
           cat "${CMAKEFILE}"
 
           # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
@@ -280,7 +280,7 @@ jobs:
           #   鏀? foreach(ffmpeg_lib avformat avutil swresample avcodec)
           # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
           sed -i 's/foreach(ffmpeg_lib avutil swresample avcodec)/foreach(ffmpeg_lib avformat avutil swresample avcodec)/' "${CMAKEFILE}"
-          grep "foreach.*avformat.*avutil" "${CMAKEFILE}" && echo "鉁?Patch 1 鐢熸晥" || { echo "鉂?Patch 1 澶辫触"; exit 1; }
+          grep "foreach.*avformat.*avutil" "${CMAKEFILE}" && echo "OK: Patch 1 applied" || { echo "FAIL: Patch 1 failed"; exit 1; }
 
           # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
           # Patch 2: add_library 閲屽姞涓?ffmpeg_demux_jni.cc
@@ -296,29 +296,29 @@ jobs:
           echo "aW1wb3J0IHJlCgpjbWFrZV9wYXRoID0gImxpYnJhcmllcy9kZWNvZGVyX2ZmbXBlZy9zcmMvbWFpbi9qbmkvQ01ha2VMaXN0cy50eHQiCndpdGggb3BlbihjbWFrZV9wYXRoLCAncicpIGFzIGY6CiAgICBjb250ZW50ID0gZi5yZWFkKCkKCiMg5oqKICJhZGRfbGlicmFyeShmZm1wZWdKTklcbiAgICAgICAgICAgIFNIQVJFRFxuICAgICAgICAgICAgZmZtcGVnX2puaS5jYykiIOaUueaIkOWKoCBmZm1wZWdfZGVtdXhfam5pLmNjCiMg5oiW6ICF5pu0566A5Y2V77ya5ZyoIGZmbXBlZ19qbmkuY2Mg6YKj6KGM5ZCO6Z2i5YqgIGZmbXBlZ19kZW11eF9qbmkuY2MKY29udGVudCA9IGNvbnRlbnQucmVwbGFjZSgKICAgICdmZm1wZWdfam5pLmNjKScsCiAgICAnZmZtcGVnX2puaS5jY1xuICAgICAgICAgICAgZmZtcGVnX2RlbXV4X2puaS5jYyknCikKCiMgUGF0Y2ggMzogdGFyZ2V0X2xpbmtfbGlicmFyaWVzIOmHjOWKoCBQUklWQVRFIGF2Zm9ybWF0CmNvbnRlbnQgPSBjb250ZW50LnJlcGxhY2UoCiAgICAnUFJJVkFURSBzd3Jlc2FtcGxlXG4gICAgICAgICAgICAgICAgICAgICAgUFJJVkFURSBhdmNvZGVjJywKICAgICdQUklWQVRFIHN3cmVzYW1wbGVcbiAgICAgICAgICAgICAgICAgICAgICBQUklWQVRFIGF2Y29kZWNcbiAgICAgICAgICAgICAgICAgICAgICBQUklWQVRFIGF2Zm9ybWF0JwopCgojIFBhdGNoIDQ6IOWKoOWFpSBhdmZvcm1hdCDnmoQgaW5jbHVkZSDnm67lvZXvvIjmnInml7bpnIDopoHvvIkKIyDlhbblrp4gaW5jbHVkZV9kaXJlY3RvcmllcyhcKSDlt7Lnu4/ljIXlkKvkuoYgZmZtcGVnIOagueebruW9lQojIGF2Zm9ybWF0IOWktOaWh+S7tuWcqCBmZm1wZWcvbGliYXZmb3JtYXQvIOS4i++8jEZGbXBlZyDlronoo4XlkI7lpLTmlofku7blupTor6XlnKggZmZtcGVnL2FuZHJvaWQtbGlicy88YWJpPi9pbmNsdWRlLwojIOS9huaIkeS7rOeUqOeahOaYr+ebtOaOpea6kOeggei3r+W+hO+8jOaJgOS7pSBsaWJhdmZvcm1hdC8g5a2Q55uu5b2V5ZyoIEZGbXBlZyDmupDnoIHmoJHph4zmnKzmnaXlsLHmnIkKIyDkuI3pnIDopoHpop3lpJbliqAKCndpdGggb3BlbihjbWFrZV9wYXRoLCAndycpIGFzIGY6CiAgICBmLndyaXRlKGNvbnRlbnQpCgpwcmludCgi4pyFIFB5dGhvbiBwYXRjaCDlrozmiJAiKQ==" | base64 -d | python3
 
           echo ""
-          echo "===== Patch 鍚?CMakeLists.txt ====="
+          echo "===== Patched CMakeLists.txt ====="
           cat "${CMAKEFILE}"
           echo ""
-          echo "===== 楠岃瘉鍏抽敭 patch ====="
-          grep "avformat avutil" "${CMAKEFILE}" && echo "鉁?avformat 鍔犲叆 foreach" || echo "鉂?avformat foreach patch 澶辫触"
-          grep "ffmpeg_demux_jni.cc" "${CMAKEFILE}" && echo "鉁?ffmpeg_demux_jni.cc 鍔犲叆 add_library" || echo "鉂?demux_jni.cc patch 澶辫触"
-          grep "PRIVATE avformat" "${CMAKEFILE}" && echo "鉁?avformat 鍔犲叆 target_link_libraries" || echo "鉂?avformat link patch 澶辫触"
+          echo "===== Verify key patches ====="
+          grep "avformat avutil" "${CMAKEFILE}" && echo "OK: avformat added to foreach" || echo "FAIL: avformat foreach patch failed"
+          grep "ffmpeg_demux_jni.cc" "${CMAKEFILE}" && echo "OK: ffmpeg_demux_jni.cc added to add_library" || echo "FAIL: demux_jni.cc patch failed"
+          grep "PRIVATE avformat" "${CMAKEFILE}" && echo "OK: avformat added to target_link_libraries" || echo "FAIL: avformat link patch failed"
 
           # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
           # 寮烘牎楠? libavformat.a 蹇呴』瀛樺湪浜庢瘡涓?ABI 鐩綍
           # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
           echo ""
-          echo "===== 寮烘牎楠? libavformat.a ====="
+          echo "===== Sanity-check libavformat.a ====="
           for abi in armeabi-v7a arm64-v8a x86 x86_64; do
             LIBAV="${FFMPEG_JNI_DIR}/ffmpeg/android-libs/$abi/libavformat.a"
             if test -f "$LIBAV"; then
-              echo "鉁?$abi: libavformat.a 瀛樺湪 ($(du -h $LIBAV | cut -f1))"
+              echo "OK: $abi: libavformat.a exists ($(du -h $LIBAV | cut -f1))"
             else
-              echo "鉂?$abi: libavformat.a 缂哄け! 鏃犳硶閾炬帴"
+              echo "FAIL: $abi: libavformat.a missing! cannot link"
               ls -la "${FFMPEG_JNI_DIR}/ffmpeg/android-libs/$abi/" 2>&1
               # 鎵撳嵃 FFmpeg configure 鏄惁鍚敤浜?avformat
-              echo "--- 妫€鏌?FFmpeg 缂栬瘧閰嶇疆 ---"
-              cat "${FFMPEG_JNI_DIR}/ffmpeg/android-libs/$abi/config.log" 2>/dev/null | grep -i avformat | head -n 5 || echo "(鏃?config.log)"
+              echo "--- Check FFmpeg build config ---"
+              cat "${FFMPEG_JNI_DIR}/ffmpeg/android-libs/$abi/config.log" 2>/dev/null | grep -i avformat | head -n 5 || echo "(no config.log)"
               exit 2
             fi
           done
@@ -340,12 +340,12 @@ jobs:
           export PATH="${CMAKE_DIR}/bin:${NDK_DIR}:${SDK_ROOT}/cmdline-tools/latest/bin:${SDK_ROOT}/build-tools/34.0.0:${SDK_ROOT}/platform-tools:${PATH}"
 
           TARGET_PROJECT=":lib-decoder-ffmpeg"
-          echo "鐩爣妯″潡: $TARGET_PROJECT"
+          echo "Target module: $TARGET_PROJECT"
 
-          echo "===== dry-run 楠岃瘉 ====="
+          echo "===== dry-run verify ====="
           ./gradlew "${TARGET_PROJECT}:assembleRelease" --dry-run --no-daemon 2>&1 | tail -n 10
 
-          echo "===== 姝ｅ紡缂栬瘧 assembleRelease ====="
+          echo "===== Building assembleRelease ====="
           ./gradlew "${TARGET_PROJECT}:assembleRelease" \
             --no-daemon --stacktrace --no-build-cache --no-configuration-cache \
             -PdisablePreDex -Pandroid.builder.sdkDownload=false
@@ -358,18 +358,18 @@ jobs:
             AAR=$(find "${{ env.MEDIA3_CHECKOUT }}" -name "*.aar" -path "*release*" -print 2>/dev/null | head -n1)
           fi
           echo ""
-          echo "===== AAR 鎵惧埌 ====="
+          echo "===== AAR found ====="
           echo "AAR=$AAR"
           ls -lh "$AAR"
 
           # 楠岃瘉 AAR 鍐呭
           echo ""
-          echo "===== AAR 鍐呴儴缁撴瀯 ====="
+          echo "===== AAR internal structure ====="
           unzip -l "${AAR}" | head -n 40
 
           # 鍏抽敭楠岃瘉锛?so 鏄惁鍖呭惈 avformat 绗﹀彿
           echo ""
-          echo "===== 寮烘牎楠? .so 蹇呴』閾炬帴 avformat 绗﹀彿 ====="
+          echo "===== Sanity-check: .so must link avformat symbols ====="
           TMPDIR=$(mktemp -d)
           cd "$TMPDIR"
           unzip -q "${AAR}" "jni/*/libffmpegJNI.so" 2>/dev/null
@@ -377,28 +377,28 @@ jobs:
             SO="jni/$abi/libffmpegJNI.so"
             if [ -f "$SO" ]; then
               echo "--- $abi ---"
-              echo "  澶у皬: $(ls -lh $SO | cut -f5)"
+              echo "  size: $(ls -lh $SO | cut -f5)"
               # 鐢?ndk 鐨?llvm-nm 妫€鏌?avformat 绗﹀彿
               NM="${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
               if [ -f "$NM" ]; then
                 AVFMT_SYMS=$("$NM" "$SO" 2>/dev/null | grep -c "avformat_" || true)
-                echo "  avformat_ 绗﹀彿鏁? $AVFMT_SYMS"
+                echo "  avformat_ symbols: $AVFMT_SYMS"
                 if [ "$AVFMT_SYMS" -gt 0 ]; then
-                  echo "  鉁?avformat 宸查摼鎺?"
+                  echo "  OK: avformat linked"
                 else
-                  echo "  鉂?avformat 鏈摼鎺?"
+                  echo "  FAIL: avformat not linked"
                 fi
                 # 妫€鏌ユ垜浠殑 demux JNI 鍑芥暟
                 DEMUX_SYMS=$("$NM" "$SO" 2>/dev/null | grep -c "Java_com_wmplay_extractor_FfmpegExtractor" || true)
-                echo "  demux JNI 绗﹀彿鏁? $DEMUX_SYMS"
+                echo "  demux JNI symbols: $DEMUX_SYMS"
                 if [ "$DEMUX_SYMS" -gt 0 ]; then
-                  echo "  鉁?demux JNI 鍑芥暟宸插鍑?"
+                  echo "  OK: demux JNI functions exported"
                 else
-                  echo "  鉂?demux JNI 鍑芥暟鏈鍑?"
+                  echo "  FAIL: demux JNI functions not exported"
                 fi
               fi
             else
-              echo "鉂?$abi/libffmpegJNI.so 涓嶅瓨鍦?"
+              echo "FAIL: $abi/libffmpegJNI.so missing"
             fi
           done
           cd /
