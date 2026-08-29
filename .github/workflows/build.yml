@@ -193,23 +193,64 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_HOME"
           echo "Free mem (before): $(free -h | grep Mem)"
 
-          # 只编 decoder_ffmpeg 模块的 release aar
-          #   -q  静默只输出错误
+          # ------------------------------------------------------------
+          # 关键一步：先列出所有 Gradle 子项目，确认真实的 decoder_ffmpeg 模块名
+          #   (旧的 Media3 可能叫 ':libraries:decoder_ffmpeg'，新版可能叫别的，
+          #    比如 ':decoder_ffmpeg' / ':media3-decoder-ffmpeg' 等，
+          #    必须以 Gradle 自己打印出的 projects 列表为准，避免报 project not found)
+          # ------------------------------------------------------------
+          echo "===== Gradle 项目所有子模块列表 ====="
+          ./gradlew projects --no-daemon 2>&1 | tee /tmp/gradle_projects.log
+          echo "===== 过滤出和 decoder/ffmpeg 相关的子模块 ====="
+          grep -i "decoder\|ffmpeg" /tmp/gradle_projects.log || true
+
+          # ------------------------------------------------------------
+          # 自动匹配正确的子模块名：优先匹配 ':libraries:decoder_ffmpeg'，
+          # 没匹配到就取所有模块名里包含 'decoder' 且包含 'ffmpeg' 的第一个
+          # ------------------------------------------------------------
+          TARGET_PROJECT=$( \
+            grep -oE ":[^[:space:]]+" /tmp/gradle_projects.log \
+              | grep -i "decoder" \
+              | grep -i "ffmpeg" \
+              | head -n1 )
+          if [ -z "$TARGET_PROJECT" ]; then
+            echo "ERROR: 没找到 decoder_ffmpeg 子模块！上面的 projects 列表里找看看是不是名字变了"
+            exit 1
+          fi
+          echo ">>>>>> 最终编的子模块是: $TARGET_PROJECT"
+
+          # ------------------------------------------------------------
+          # 只编目标模块的 release aar
           #   --no-daemon  跑一次就退出，不占内存
           #   --stacktrace  如果失败就打印完整栈
+          # ------------------------------------------------------------
           ./gradlew \
-            :libraries:decoder_ffmpeg:assembleRelease \
+            ${TARGET_PROJECT}:assembleRelease \
             --no-daemon \
             --stacktrace \
             --no-build-cache \
             -PdisablePreDex \
             -Pandroid.builder.sdkDownload=false
 
-          echo "==== AAR 产物信息 ===="
-          AAR="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/build/outputs/aar/decoder_ffmpeg-release.aar"
+          # ------------------------------------------------------------
+          # 找 AAR 产物（不硬编码路径，子模块名不一样 build 输出路径也不一样）
+          #   规则：找所有 build/outputs/aar/ 下名字包含 release 的 aar 文件，取最大那个
+          # ------------------------------------------------------------
+          echo "==== AAR 产物搜索结果 ===="
+          AAR_CANDIDATES=($(find "${{ env.MEDIA3_CHECKOUT }}" \
+                              -type f -path "*/build/outputs/aar/*release*.aar" 2>/dev/null))
+          if [ ${#AAR_CANDIDATES[@]} -eq 0 ]; then
+            echo "ERROR: 没找到任何 release aar！检查上面 Gradle 构建是否成功"
+            exit 1
+          fi
+          # 按文件大小降序排列，最大的就是带所有 ABI 的正式 release AAR
+          AAR=$(ls -1S "${AAR_CANDIDATES[@]}" 2>/dev/null | head -n1)
+          echo ">>>>>> 最终选中的 AAR: $AAR"
           ls -lh "${AAR}"
           echo "AAR 内部结构预览（确认 4 套 ABI 的 .so 都在）:"
           unzip -l "${AAR}"
+          # 把 AAR 路径写入共享环境变量，后续上传/发布步骤引用
+          echo "FINAL_AAR_PATH=$AAR" >> "$GITHUB_ENV"
 
       # ===================== 7. 上传 AAR 到 Actions Artifacts (可以下载 90 天) =====================
       - name: "[上传] 上传 AAR 到 Artifacts (点击 Actions 页下载)"
@@ -217,7 +258,7 @@ jobs:
         with:
           name: "decoder_ffmpeg-release-media3-1.5.1"
           path: |
-            /tmp/media3/libraries/decoder_ffmpeg/build/outputs/aar/decoder_ffmpeg-release.aar
+            ${{ env.FINAL_AAR_PATH }}
           retention-days: 90
           if-no-files-found: error
 
@@ -253,6 +294,6 @@ jobs:
                }
                ```
           files: |
-            /tmp/media3/libraries/decoder_ffmpeg/build/outputs/aar/decoder_ffmpeg-release.aar
+            ${{ env.FINAL_AAR_PATH }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
