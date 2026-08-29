@@ -16,6 +16,10 @@ jobs:
   build-aar:
     runs-on: ubuntu-22.04
     timeout-minutes: 180   # 最多允许跑 3 小时，防止卡死
+    # ⚠️ 创建 GitHub Release 需要 contents: write 权限（默认 GITHUB_TOKEN 没有）
+    # 不加这一行，softprops/action-gh-release 会报 403 "Resource not accessible by integration"
+    permissions:
+      contents: write
     env:
       MEDIA3_TAG: "1.5.1"                        # 和项目 build.gradle 中的 media3 版本一致
       # ⚠️  注意：Media3 1.5.1 在 common_library_config.gradle 里硬编码了 android.ndkVersion = "25.1.8937393"
