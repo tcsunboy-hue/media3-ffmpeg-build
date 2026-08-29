@@ -311,32 +311,24 @@ jobs:
           echo "Disk free /tmp & /opt: $(df -h / /tmp 2>/dev/null | grep -v Filesystem)"
 
           # ══════════════════════════════════════════════════════════
-          # 先用 gradlew projects 列出所有子模块，正则匹配含 decoder & ffmpeg 的那个
-          #   (Media3 settings.gradle 最后一行 apply from: 'core_settings.gradle' 里定义了真正的 include 名字)
+          # 直接硬编码模块名（Media3 1.5.1 的 settings.gradle 是固定的，
+          # core_settings.gradle 里 include 出来的名字就是 :lib-decoder-ffmpeg）
+          # 之前用「gradlew projects + grep」动态匹配但 TARGET_PROJECT 可能匹配错了，
+          # 导致 Gradle 编了别的模块但说 BUILD SUCCESSFUL，自然找不到 AAR
           # ══════════════════════════════════════════════════════════
-          echo "===== Gradle 项目所有子模块列表 ====="
-          ./gradlew projects --no-daemon 2>&1 | tee /tmp/gradle_projects.log || echo "(gradlew projects 本身失败了？看上面的日志)"
-          echo "===== 过滤出和 decoder/ffmpeg 相关的子模块 ====="
-          grep -oiE ":[A-Za-z0-9_:-]*decoder[A-Za-z0-9_:-]*ffmpeg[A-Za-z0-9_:-]*" /tmp/gradle_projects.log || true
-          grep -oiE ":[A-Za-z0-9_:-]*ffmpeg[A-Za-z0-9_:-]*decoder[A-Za-z0-9_:-]*" /tmp/gradle_projects.log || true
-
-          TARGET_PROJECT=$( \
-            grep -oE ":[^[:space:]]+" /tmp/gradle_projects.log \
-              | grep -i "decoder" \
-              | grep -i "ffmpeg" \
-              | sort -u \
-              | head -n1 )
-          if [ -z "$TARGET_PROJECT" ]; then
-            echo "ERROR: 没找到 decoder_ffmpeg 子模块！检查上面 projects 输出（第 5 次成功 run 显示应该是 :lib-decoder-ffmpeg）"
-            exit 1
-          fi
-          echo ">>>>>> 最终编的子模块是: $TARGET_PROJECT"
+          TARGET_PROJECT=":lib-decoder-ffmpeg"
+          echo ">>>>>> 硬编码目标模块: $TARGET_PROJECT"
 
           # ══════════════════════════════════════════════════════════
-          # 汇编 release AAR
+          # 汇编 release AAR（加 --dry-run 先验证一下 Gradle 认不认这个任务）
           # ══════════════════════════════════════════════════════════
+          echo "===== dry-run 验证 Gradle 能否识别 ${TARGET_PROJECT}:assembleRelease ====="
+          ./gradlew "${TARGET_PROJECT}:assembleRelease" \
+            --dry-run --no-daemon 2>&1 | tail -n 20
+
+          echo "===== 正式汇编 ${TARGET_PROJECT}:assembleRelease ====="
           ./gradlew \
-            ${TARGET_PROJECT}:assembleRelease \
+            "${TARGET_PROJECT}:assembleRelease" \
             --no-daemon \
             --stacktrace \
             --no-build-cache \
@@ -345,20 +337,38 @@ jobs:
             -Pandroid.builder.sdkDownload=false
 
           # ══════════════════════════════════════════════════════════
-          # 找 AAR + 强校验 AAR 里必须有 4 套 ABI 的 libffmpegJNI.so
-          #   （没装 CMake 时也能「编出 AAR」，但 AAR 里没有 jni/*.so，手机上必崩，所以这里一定要强校验）
+          # 1. 先直接 ls 我们预期的路径（比 find 快 + 确定性强）
+          #    Media3 library 模块 AAR 固定输出到:
+          #    libraries/decoder_ffmpeg/build/outputs/aar/lib-decoder-ffmpeg-release.aar
           # ══════════════════════════════════════════════════════════
-          echo "==== AAR 产物搜索结果 ===="
-          mapfile -t AAR_CANDIDATES < <(find "${{ env.MEDIA3_CHECKOUT }}" \
-                              -type f -path "*/build/outputs/aar/*release*.aar" 2>/dev/null)
-          if [ ${#AAR_CANDIDATES[@]} -eq 0 ]; then
-            echo "ERROR: 没找到任何 release aar！检查 Gradle assembleRelease 是否成功"
-            exit 1
+          DECODER_BUILD="${{ env.MEDIA3_CHECKOUT }}/libraries/decoder_ffmpeg/build"
+          EXPECTED_AAR="${DECODER_BUILD}/outputs/aar/lib-decoder-ffmpeg-release.aar"
+          echo "===== decoder_ffmpeg build 目录结构 ====="
+          ls -laR "${DECODER_BUILD}" 2>/dev/null | head -n 40
+          echo "===== 检查预期 AAR 路径 ====="
+          echo "预期 AAR 路径: $EXPECTED_AAR"
+          if [ -f "$EXPECTED_AAR" ]; then
+            AAR="$EXPECTED_AAR"
+            echo "✅ 直接命中预期路径: $(ls -lh "$AAR")"
+          else
+            echo "⚠️ 预期路径不存在，放宽搜索整个 checkout 下所有 .aar..."
+            mapfile -t AAR_CANDIDATES < <(find "${{ env.MEDIA3_CHECKOUT }}" \
+                                -type f \( -name "*.aar" -o -name "*release*.aar" \) 2>/dev/null)
+            echo "find 找到 ${#AAR_CANDIDATES[@]} 个候选:"
+            printf '  %s\n' "${AAR_CANDIDATES[@]}"
+            if [ ${#AAR_CANDIDATES[@]} -eq 0 ]; then
+              echo "ERROR: 整个 Media3 checkout 下没有任何 .aar 文件!"
+              echo "Gradle 输出了 BUILD SUCCESSFUL 但没产出 AAR，说明:"
+              echo "  1) ${TARGET_PROJECT} 这个模块可能不存在（dry-run 应该已经报 task not found）"
+              echo "  2) 或者 externalNativeBuild 条件没触发（ffmpeg 目录 symlink 问题）"
+              echo "===== Gradle projects 实时列出所有模块 ====="
+              ./gradlew projects --no-daemon --console=plain 2>&1 | grep -E "^\\+---|^\\\\---" | head -n 30
+              exit 1
+            fi
+            # 按文件大小降序，取最大那个
+            AAR=$(ls -1S "${AAR_CANDIDATES[@]}" | head -n1)
+            echo ">>>>>> 选中的 AAR: $AAR ($(du -h "$AAR" | cut -f1))"
           fi
-          # 按文件大小降序，取最大那个
-          AAR=$(ls -1S "${AAR_CANDIDATES[@]}" | head -n1)
-          echo ">>>>>> 最终选中的 AAR: $AAR"
-          ls -lh "${AAR}"
           echo "==== AAR 内部结构预览 (重点看 jni/ 下的 .so) ===="
           unzip -l "${AAR}"
           echo "===== 强校验: 4 套 ABI 的 libffmpegJNI.so 必须存在 ====="
