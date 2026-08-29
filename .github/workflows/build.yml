@@ -226,28 +226,32 @@ jobs:
           chmod +x gradlew
 
           # ══════════════════════════════════════════════════════════
-          # Patch 1: CMakeLists.txt — 关闭 AGP 默认加的 -Wl,--no-undefined
+          # Patch 1: CMakeLists.txt — 解决 NDK r25b Bionic stderr 符号问题
           # ══════════════════════════════════════════════════════════
-          # NDK r25b 的 Bionic libc 不再导出全局符号 `stderr`（它是 <stdio.h> 里的宏），
-          # 但 FFmpeg 6.0 的 libavutil.a (log.c) 直接引用了 stderr 作为符号，
-          # 加上 AGP 默认 -Wl,--no-undefined，导致链接 .so 时报
-          #   ld: error: undefined symbol: stderr  (referenced by libavutil/log.c)
-          # 解决：追加一行 target_link_options 覆盖 --no-undefined，
-          # 让链接器容忍这个未解析符号（运行时 Bionic 动态链接器会处理）。
+          # 背景：
+          #   - AGP 的 CMake toolchain 自动加了 -Wl,--no-undefined（所有符号必须已定义）
+          #   - NDK r25b 的 Bionic libc 把 stderr 从全局符号变成了 <stdio.h> 里的宏
+          #   - FFmpeg 6.0 的 libavutil.a (log.c) 仍引用 stderr 作为链接符号
+          #   - 结果：ld: error: undefined symbol: stderr
+          #
+          # 之前的 patch 错误地用了 -Wl,--no-undefined=false（链接器不认识这个语法，
+          # 直接报 "unknown argument '--no-undefined=false'"）
+          #
+          # 正确做法：用 -Wl,--undefined=stderr 只放过 stderr 这一个符号，
+          # 同时保留 AGP 的 --no-undefined 让其他未定义符号仍然报错（安全网）。
           CMAKEFILE="libraries/decoder_ffmpeg/src/main/jni/CMakeLists.txt"
-          echo "--- Patch 1: 追加 link flag 关闭 --no-undefined ---"
+          echo "--- Patch 1: 追加 link flag 允许 stderr 未定义 ---"
           echo "原始 CMakeLists.txt 末尾："
           tail -n 5 "${CMAKEFILE}"
-          # 用 printf + >> 追加最简单，避开 Python/heredoc 在 YAML run 块里的引号嵌套地狱
-          # 每一行就是一个独立 shell 命令，没有任何引号嵌套，GitHub Actions YAML 不会炸
           printf '\n' >> "${CMAKEFILE}"
           printf '# PATCH: fix NDK r25b Bionic stderr undefined symbol\n' >> "${CMAKEFILE}"
-          printf 'target_link_options(ffmpegJNI PRIVATE "-Wl,--no-undefined=false")\n' >> "${CMAKEFILE}"
-          printf '# PATCH: explicitly link log library for robustness\n' >> "${CMAKEFILE}"
+          printf '# Use --undefined=stderr to only allow stderr unresolved, keep other strict checks\n' >> "${CMAKEFILE}"
+          printf 'target_link_options(ffmpegJNI PRIVATE "-Wl,--undefined=stderr")\n' >> "${CMAKEFILE}"
+          printf '# PATCH: explicitly link log library for robustness (libavutil uses android_log)\n' >> "${CMAKEFILE}"
           printf 'target_link_libraries(ffmpegJNI PRIVATE log)\n' >> "${CMAKEFILE}"
           echo "Patch 后 CMakeLists.txt 末尾："
           tail -n 10 "${CMAKEFILE}"
-          grep -q 'no-undefined=false' "${CMAKEFILE}" && echo "✅ patch 1 生效" || echo "❌ patch 1 失败"
+          grep -q 'undefined=stderr' "${CMAKEFILE}" && echo "✅ patch 1 生效" || echo "❌ patch 1 失败"
 
           # ══════════════════════════════════════════════════════════
           # 强校验 CMake 静态库位置（CMakelists.txt 第 25 行写死的查找路径！）
